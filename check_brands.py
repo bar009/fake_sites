@@ -102,6 +102,11 @@ def main() -> None:
     print(f"Run folder: {run_dir}")
     print(f"{len(brands)} brand(s), top {args.top} results each, provider: {provider.name}\n")
 
+    def flush() -> None:
+        write_json(rows, run_dir / "results.json")
+        write_xlsx(rows, run_dir / "results.xlsx")
+        write_html(rows, run_dir / "report.html", run_dir.name)
+
     with Capturer() as capturer:
         for i, entry in enumerate(brands, start=1):
             brand, topic = entry["brand"], entry["topic"]
@@ -160,10 +165,10 @@ def main() -> None:
                     "error": errors,
                 })
 
-    write_json(rows, run_dir / "results.json")
-    write_xlsx(rows, run_dir / "results.xlsx")
-    run_name = run_dir.name
-    write_html(rows, run_dir / "report.html", run_name)
+            # hours-long batches must survive a crash mid-run
+            flush()
+
+    flush()
 
     suspicious = sum(1 for r in rows if r.get("flags"))
     found = sum(1 for r in rows if r.get("url"))
