@@ -59,6 +59,11 @@ def capture_target(url: str) -> tuple[str, str]:
 
 
 def main() -> None:
+    # when output is redirected (background runs), Windows defaults to cp1252,
+    # which crashes on non-Latin characters that appear in scam URLs/titles
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(description="Hunt fake .shop brand sites.")
     parser.add_argument("brands_csv", type=Path, help="CSV with columns: brand[,topic]")
     parser.add_argument("--top", type=int, default=3, help="results per brand (default 3)")
@@ -120,6 +125,10 @@ def main() -> None:
                 rows.append({"brand": brand, "topic": topic, "rank": "", "url": "",
                              "flags": [], "error": f"search failed: {e}"})
                 continue
+
+            # search engines sneak ad/redirect links (bing.com/aclick, ...) into
+            # results despite the site:.shop operator - keep only .shop domains
+            results = [r for r in results if domain_of(r.url).endswith(".shop")]
 
             if not results:
                 print("no results")
