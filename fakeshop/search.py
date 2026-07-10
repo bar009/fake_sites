@@ -68,6 +68,14 @@ class DdgsProvider:
                     ))
                 return results
             except Exception as e:  # noqa: BLE001 - rate limits surface as generic errors
+                # "No results found" is a real answer (most brands have no fake
+                # site with this template) - one retry to rule out flakiness,
+                # then report it as an empty result, not a failure.
+                if "no results" in str(e).lower():
+                    if attempt < 2:
+                        time.sleep(6 + random.uniform(0, 4))
+                        continue
+                    return []
                 last_error = e
                 if attempt < MAX_ATTEMPTS:
                     time.sleep(10 * attempt + random.uniform(0, 5))
