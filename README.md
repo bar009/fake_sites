@@ -24,6 +24,8 @@ python -m venv .venv
 
 - `--top 5` — כמה תוצאות לכל מותג (ברירת מחדל 3)
 - `--brand Nike` — להריץ רק מותג אחד מהקובץ
+- `--topic watches` — להריץ רק נושא אחד (מומלץ להריץ נושא-נושא ולא את כל ה-300 בבת אחת)
+- `--list-topics` — להציג את רשימת הנושאים והכמויות בלי להריץ
 - `--provider brave` — לחפש דרך Brave Search API במקום DuckDuckGo
   (דורש `BRAVE_API_KEY` בקובץ `.env`, ראו `.env.example`)
 

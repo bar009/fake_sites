@@ -1,4 +1,301 @@
 brand,topic
 Nike,sportswear
 Adidas,sportswear
+Puma,sportswear
+Under Armour,sportswear
+Reebok,sportswear
+New Balance,sportswear
+Asics,sportswear
+Fila,sportswear
+Champion,sportswear
+Lululemon,sportswear
+Gymshark,sportswear
+Umbro,sportswear
+Kappa,sportswear
+Ellesse,sportswear
+Le Coq Sportif,sportswear
+Converse,footwear
+Vans,footwear
+Timberland,footwear
+Dr. Martens,footwear
+Birkenstock,footwear
+Crocs,footwear
+UGG,footwear
+Skechers,footwear
+Salomon,footwear
+Hoka,footwear
+On Running,footwear
+Clarks,footwear
+Ecco,footwear
+Geox,footwear
+Steve Madden,footwear
+Louis Vuitton,luxury-fashion
+Gucci,luxury-fashion
+Chanel,luxury-fashion
+Prada,luxury-fashion
+Hermes,luxury-fashion
+Dior,luxury-fashion
+Balenciaga,luxury-fashion
+Versace,luxury-fashion
+Fendi,luxury-fashion
+Burberry,luxury-fashion
+Givenchy,luxury-fashion
+Saint Laurent,luxury-fashion
+Bottega Veneta,luxury-fashion
+Valentino,luxury-fashion
+Dolce & Gabbana,luxury-fashion
+Zara,fashion
+H&M,fashion
+Uniqlo,fashion
+Ralph Lauren,fashion
+Tommy Hilfiger,fashion
+Calvin Klein,fashion
+Lacoste,fashion
+Hugo Boss,fashion
+Levi's,fashion
+Diesel,fashion
+Guess,fashion
+Gap,fashion
+Mango,fashion
+Massimo Dutti,fashion
+Abercrombie & Fitch,fashion
+Supreme,streetwear
+Off-White,streetwear
+Stussy,streetwear
+Palace,streetwear
+BAPE,streetwear
+Carhartt,streetwear
+Obey,streetwear
+Kith,streetwear
+Fear of God,streetwear
+Stone Island,streetwear
+C.P. Company,streetwear
+Billionaire Boys Club,streetwear
+Anti Social Social Club,streetwear
+Vetements,streetwear
+Aime Leon Dore,streetwear
+Rolex,watches
+Omega,watches
+Casio,watches
+Seiko,watches
+Citizen,watches
+TAG Heuer,watches
+Breitling,watches
+Patek Philippe,watches
+Audemars Piguet,watches
+Cartier,watches
+Tissot,watches
+Fossil,watches
+Longines,watches
+Swatch,watches
+G-Shock,watches
+Pandora,jewelry
+Tiffany & Co,jewelry
+Swarovski,jewelry
+Bvlgari,jewelry
+Van Cleef & Arpels,jewelry
+Chopard,jewelry
+Mejuri,jewelry
+APM Monaco,jewelry
+Thomas Sabo,jewelry
+Monica Vinader,jewelry
+Coach,bags-luggage
+Michael Kors,bags-luggage
+Kate Spade,bags-luggage
+Longchamp,bags-luggage
+Tumi,bags-luggage
+Samsonite,bags-luggage
+Herschel,bags-luggage
+Fjallraven,bags-luggage
+Rimowa,bags-luggage
+MCM,bags-luggage
+Ray-Ban,eyewear
+Oakley,eyewear
+Persol,eyewear
+Maui Jim,eyewear
+Costa Del Mar,eyewear
+Gentle Monster,eyewear
+Bolle,eyewear
+Serengeti,eyewear
+Spy Optic,eyewear
+Quay,eyewear
+MAC Cosmetics,makeup
+Maybelline,makeup
+L'Oreal,makeup
+Estee Lauder,makeup
+Clinique,makeup
+NARS,makeup
+Urban Decay,makeup
+Charlotte Tilbury,makeup
+Fenty Beauty,makeup
+Rare Beauty,makeup
+Benefit Cosmetics,makeup
+Too Faced,makeup
+NYX,makeup
+Huda Beauty,makeup
+Anastasia Beverly Hills,makeup
+The Ordinary,skincare
+CeraVe,skincare
+La Roche-Posay,skincare
+Kiehl's,skincare
+Drunk Elephant,skincare
+Tatcha,skincare
+La Mer,skincare
+SK-II,skincare
+Olay,skincare
+Neutrogena,skincare
+Jo Malone,perfume
+Creed,perfume
+Tom Ford,perfume
+Byredo,perfume
+Le Labo,perfume
+Diptyque,perfume
+Maison Francis Kurkdjian,perfume
+Amouage,perfume
+Parfums de Marly,perfume
+Xerjoff,perfume
+Toyota,cars
+BMW,cars
+Mercedes-Benz,cars
+Audi,cars
+Ford,cars
+Tesla,cars
+Porsche,cars
+Ferrari,cars
+Lamborghini,cars
+Honda,cars
+Volkswagen,cars
+Jeep,cars
+Land Rover,cars
+Subaru,cars
+Mazda,cars
+Harley-Davidson,motorcycles-cycling
+Ducati,motorcycles-cycling
+Yamaha,motorcycles-cycling
+Kawasaki,motorcycles-cycling
+Specialized,motorcycles-cycling
+Trek,motorcycles-cycling
+Giant,motorcycles-cycling
+Cannondale,motorcycles-cycling
+Brompton,motorcycles-cycling
+Shimano,motorcycles-cycling
+Apple,electronics
+Samsung,electronics
+Sony,electronics
+Bose,electronics
+JBL,electronics
+Beats,electronics
+Dyson,electronics
+GoPro,electronics
+DJI,electronics
+Anker,electronics
+Logitech,electronics
+Philips,electronics
+Xiaomi,electronics
+Marshall,electronics
+Sennheiser,electronics
+Nintendo,gaming
+PlayStation,gaming
+Xbox,gaming
+Razer,gaming
+SteelSeries,gaming
+Pokemon,gaming
+Magic The Gathering,gaming
+Warhammer,gaming
+Funko,gaming
+Roblox,gaming
+Minecraft,gaming
+Fortnite,gaming
+Call of Duty,gaming
+World of Warcraft,gaming
+Zelda,gaming
 Lego,toys
+Barbie,toys
+Hot Wheels,toys
+Nerf,toys
+Playmobil,toys
+Fisher-Price,toys
+Hasbro,toys
+Mattel,toys
+Squishmallows,toys
+Jellycat,toys
+Bruder,toys
+Melissa & Doug,toys
+Ty Beanie Babies,toys
+Sylvanian Families,toys
+Ravensburger,toys
+The North Face,outdoor
+Patagonia,outdoor
+Columbia,outdoor
+Arc'teryx,outdoor
+Moncler,outdoor
+Canada Goose,outdoor
+Mammut,outdoor
+Salewa,outdoor
+Jack Wolfskin,outdoor
+Osprey,outdoor
+Deuter,outdoor
+Yeti,outdoor
+Stanley,outdoor
+Helly Hansen,outdoor
+Marmot,outdoor
+Wilson,sports-equipment
+Spalding,sports-equipment
+Titleist,sports-equipment
+Callaway,sports-equipment
+Babolat,sports-equipment
+Head,sports-equipment
+Yonex,sports-equipment
+Mizuno,sports-equipment
+Everlast,sports-equipment
+Speedo,sports-equipment
+Rossignol,sports-equipment
+Burton,sports-equipment
+TaylorMade,sports-equipment
+Slazenger,sports-equipment
+Decathlon,sports-equipment
+Real Madrid,football-clubs
+FC Barcelona,football-clubs
+Manchester United,football-clubs
+Liverpool FC,football-clubs
+Arsenal,football-clubs
+Chelsea FC,football-clubs
+Bayern Munich,football-clubs
+Juventus,football-clubs
+Paris Saint-Germain,football-clubs
+AC Milan,football-clubs
+IKEA,home-kitchen
+KitchenAid,home-kitchen
+Nespresso,home-kitchen
+Le Creuset,home-kitchen
+Zwilling,home-kitchen
+Tefal,home-kitchen
+SMEG,home-kitchen
+Vitamix,home-kitchen
+Weber,home-kitchen
+Thermomix,home-kitchen
+Cybex,baby
+Bugaboo,baby
+Chicco,baby
+Graco,baby
+Stokke,baby
+UPPAbaby,baby
+Ergobaby,baby
+Doona,baby
+Joie,baby
+Maxi-Cosi,baby
+Victoria's Secret,underwear
+Skims,underwear
+Spanx,underwear
+Triumph,underwear
+Jockey,underwear
+Montblanc,pens-stationery
+Parker,pens-stationery
+Lamy,pens-stationery
+Cross,pens-stationery
+Moleskine,pens-stationery
+Fender,musical-instruments
+Gibson,musical-instruments
+Roland,musical-instruments
+Korg,musical-instruments
+Ibanez,musical-instruments

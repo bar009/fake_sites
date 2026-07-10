@@ -65,10 +65,27 @@ def main() -> None:
     parser.add_argument("--provider", choices=["ddgs", "brave"], default="ddgs",
                         help="search provider (default ddgs = DuckDuckGo, no key)")
     parser.add_argument("--brand", help="run only this brand from the CSV")
+    parser.add_argument("--topic", help="run only brands with this topic")
+    parser.add_argument("--list-topics", action="store_true",
+                        help="print topics and brand counts, then exit")
     args = parser.parse_args()
 
     load_dotenv()
     brands = load_brands(args.brands_csv)
+
+    if args.list_topics:
+        counts: dict[str, int] = {}
+        for b in brands:
+            counts[b["topic"] or "(none)"] = counts.get(b["topic"] or "(none)", 0) + 1
+        for topic, count in counts.items():
+            print(f"{count:4}  {topic}")
+        print(f"{len(brands):4}  TOTAL")
+        return
+
+    if args.topic:
+        brands = [b for b in brands if b["topic"].lower() == args.topic.lower()]
+        if not brands:
+            sys.exit(f"ERROR: topic '{args.topic}' not found in {args.brands_csv}")
     if args.brand:
         brands = [b for b in brands if b["brand"].lower() == args.brand.lower()]
         if not brands:
