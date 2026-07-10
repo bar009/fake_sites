@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import csv
+import json
 import re
 import sys
 from datetime import datetime
@@ -71,6 +72,9 @@ def main() -> None:
                         help="search provider (default ddgs = DuckDuckGo, no key)")
     parser.add_argument("--brand", help="run only this brand from the CSV")
     parser.add_argument("--topic", help="run only brands with this topic")
+    parser.add_argument("--resume", nargs="?", const="latest", default=None, metavar="RUN_DIR",
+                        help="continue an interrupted run, skipping brands already done "
+                             "(default: the most recent folder under runs/)")
     parser.add_argument("--list-topics", action="store_true",
                         help="print topics and brand counts, then exit")
     args = parser.parse_args()
@@ -99,11 +103,25 @@ def main() -> None:
     provider = get_provider(args.provider)
     whois = WhoisChecker()
 
-    run_dir = Path(__file__).parent / "runs" / datetime.now().strftime("%Y-%m-%d_%H%M")
+    rows: list[dict] = []
+    if args.resume:
+        if args.resume == "latest":
+            saved = sorted((Path(__file__).parent / "runs").glob("*/results.json"))
+            if not saved:
+                sys.exit("ERROR: --resume found no previous run under runs/")
+            run_dir = saved[-1].parent
+        else:
+            run_dir = Path(args.resume)
+            if not (run_dir / "results.json").is_file():
+                sys.exit(f"ERROR: no results.json in {run_dir}")
+        rows = json.loads((run_dir / "results.json").read_text(encoding="utf-8"))
+        done = {r["brand"] for r in rows}
+        brands = [b for b in brands if b["brand"] not in done]
+        print(f"Resuming {run_dir.name}: {len(done)} brands already done, {len(brands)} to go")
+    else:
+        run_dir = Path(__file__).parent / "runs" / datetime.now().strftime("%Y-%m-%d_%H%M")
     shots_dir = run_dir / "screenshots"
     shots_dir.mkdir(parents=True, exist_ok=True)
-
-    rows: list[dict] = []
     print(f"Run folder: {run_dir}")
     print(f"{len(brands)} brand(s), top {args.top} results each, provider: {provider.name}\n")
 
@@ -124,6 +142,7 @@ def main() -> None:
                 print(f"SEARCH FAILED: {e}")
                 rows.append({"brand": brand, "topic": topic, "rank": "", "url": "",
                              "flags": [], "error": f"search failed: {e}"})
+                flush()
                 continue
 
             # search engines sneak ad/redirect links (bing.com/aclick, ...) into
@@ -134,6 +153,7 @@ def main() -> None:
                 print("no results")
                 rows.append({"brand": brand, "topic": topic, "rank": "", "url": "",
                              "flags": [], "error": "no search results"})
+                flush()
                 continue
 
             print(f"{len(results)} result(s)")
