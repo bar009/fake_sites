@@ -80,18 +80,23 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
     with TestClient(app) as client:
         dashboard = client.get("/")
         assert "/static/vendor/htmx.min.js" in dashboard.text
+        assert '/static/favicon.svg' in dashboard.text
+        favicon = client.get("/favicon.ico")
+        assert favicon.status_code == 200
+        assert favicon.headers["content-type"].startswith("image/svg+xml")
         assert "unpkg.com" not in dashboard.text
         assert "https://unpkg.com" not in dashboard.headers["content-security-policy"]
         assert "High-risk companies" in dashboard.text
         assert "Awaiting review (companies)" in dashboard.text
         investigations = client.get("/findings")
         assert investigations.status_code == 200
-        assert "Open any row to review the website" in investigations.text
+        assert "Priority belongs to the company; risk belongs to the website" in investigations.text
+        assert "Company priority" in investigations.text
         assert f'href="/findings/{finding_id}"' in investigations.text
         assert "https://example-sale.shop/path" in investigations.text
         assert f'src="/findings/{finding_id}/screenshot"' in investigations.text
         global_partial = client.get("/findings/list?risk=low", headers={"HX-Request": "true"})
-        assert "No matching findings" in global_partial.text
+        assert "No matching companies" in global_partial.text
         filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
         assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
         partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})
@@ -102,6 +107,7 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert "example.com" in detail.text
         assert "Detected indicators" in detail.text
         assert "Copy case summary" in detail.text
+        assert "Company priority" in detail.text
         assert "Potential brand impersonation case" in detail.text
         assert '<a href="https://example-sale.shop' not in detail.text
         mappings = client.get("/mappings")
@@ -109,6 +115,19 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         exported = client.get(f"/scans/{scan_id}/export/html")
         assert "<html lang='en' dir='ltr'>" in exported.text
         assert "Scan #" in exported.text
+
+
+def test_windows_readme_requires_no_terminal_knowledge():
+    root = web.PROJECT_ROOT
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    launcher = (root / "start_windows.bat").read_text(encoding="utf-8")
+    assert "Add python.exe to PATH" in readme
+    assert "Extract All" in readme
+    assert "Double-click `start_windows.bat`" in readme
+    assert "Open in Terminal" not in readme
+    assert "-m fakeshop.web" in launcher
+    assert "playwright install chromium" in launcher
+    assert (web.PACKAGE_DIR / "static" / "favicon.svg").is_file()
 
 
 def test_user_interface_contains_no_fixed_hebrew_copy():

@@ -150,13 +150,13 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
             request, "dashboard.html",
             context(
                 request, scans=repository.list_scans(), stats=repository.dashboard_stats(),
-                active_scans=repository.active_scans(), urgent_findings=repository.urgent_findings(),
+                active_scans=repository.active_scans(), urgent_companies=repository.urgent_companies(),
             ),
         )
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
-        return Response(status_code=204)
+        return FileResponse(PACKAGE_DIR / "static" / "favicon.svg", media_type="image/svg+xml")
 
     @app.get("/scans/new", response_class=HTMLResponse)
     def new_scan(request: Request):
@@ -289,27 +289,27 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
 
     @app.get("/findings", response_class=HTMLResponse)
     def investigations(request: Request, risk: str = "", review: str = "",
-                       q: str = "", sort: str = "priority"):
-        findings = repository.list_all_finding_groups(
+                       q: str = "", sort: str = "company"):
+        companies = repository.list_company_investigations(
             risk=risk, review=review, q=q, sort=sort,
         )
         return templates.TemplateResponse(
             request, "findings.html",
             context(
-                request, findings=findings, risk_filter=risk,
+                request, companies=companies, risk_filter=risk,
                 review_filter=review, q_filter=q, sort_filter=sort,
             ),
         )
 
     @app.get("/findings/list", response_class=HTMLResponse)
     def investigations_list(request: Request, risk: str = "", review: str = "",
-                            q: str = "", sort: str = "priority"):
-        findings = repository.list_all_finding_groups(
+                            q: str = "", sort: str = "company"):
+        companies = repository.list_company_investigations(
             risk=risk, review=review, q=q, sort=sort,
         )
         return templates.TemplateResponse(
-            request, "partials/findings_table.html",
-            context(request, findings=findings),
+            request, "partials/company_investigations.html",
+            context(request, companies=companies),
         )
 
     @app.get("/findings/{finding_id}", response_class=HTMLResponse)

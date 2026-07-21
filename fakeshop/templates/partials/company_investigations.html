@@ -1,0 +1,36 @@
+{% from "macros/ui.html" import icon, risk_badge, status_badge %}
+<div id="findings-results" class="company-investigation-list">
+{% if companies %}
+  {% for company in companies %}
+  <section class="company-investigation" id="company-{{ company.anchor_id }}">
+    <header class="company-investigation-header">
+      <div class="company-heading"><span class="company-letter">{{ company.company_name[:1]|upper }}</span><div><span class="section-kicker">Company</span><h3>{{ company.company_name }}</h3><p>{% if company.brands|length > 1 %}Brands: {{ company.brands|join(', ') }}{% else %}{{ company.brands[0] }}{% endif %}{% if company.ticker %} · {{ company.ticker }}{% endif %}</p></div></div>
+      <div class="company-metrics" aria-label="Company investigation metrics">
+        <div><span>Company priority</span><strong>{{ company.priority_score }}<small>/100</small></strong></div>
+        <div><span>Domains</span><strong>{{ company.domain_count }}</strong></div>
+        <div><span>High risk</span><strong>{{ company.high_domain_count }}</strong></div>
+        <div><span>Awaiting review</span><strong>{{ company.awaiting_review_count }}</strong></div>
+      </div>
+    </header>
+    <div class="company-domain-head" aria-hidden="true"><span>Website risk</span><span>Domain evidence</span><span>Age</span><span>Indicators</span><span>Review</span><span>Open</span></div>
+    <div class="company-domain-list">
+      {% for finding in company.domains %}
+      <a class="company-domain-row" href="/findings/{{ finding.id }}" aria-label="Open website evidence for {{ finding.registrable_domain or finding.domain }}">
+        <span>{{ risk_badge(finding.risk_level, finding.risk_score) }}</span>
+        <span class="finding-identity">
+          {% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="Screenshot of {{ finding.registrable_domain or finding.domain }}" loading="lazy">{% else %}<span class="thumb-placeholder">{{ icon('shield', 18) }}</span>{% endif %}
+          <span><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · {{ finding.page_count }} captured page{% if finding.page_count != 1 %}s{% endif %}</small><code class="finding-safe-url">{{ finding.url }}</code></span>
+        </span>
+        <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</span>
+        <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>signals</small></span>
+        <span>{{ status_badge(finding.review_status) }}</span>
+        <span class="row-arrow">{{ icon('chevron', 17) }}<span class="sr-only">Open website case</span></span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+  <div class="empty-panel"><span>{{ icon('search', 24) }}</span><strong>No matching companies</strong><p>Change the search or remove a filter.</p></div>
+{% endif %}
+</div>
