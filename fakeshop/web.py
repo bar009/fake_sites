@@ -1,4 +1,4 @@
-"""Local Hebrew RTL FastAPI interface for Fake Shop Checker."""
+"""Local English FastAPI interface for Fake Shop Checker."""
 
 from __future__ import annotations
 
@@ -286,6 +286,31 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         repository.delete_scan(scan_id)
         shutil.rmtree(data_dir / "scans" / str(scan_id), ignore_errors=True)
         return RedirectResponse("/", status_code=303)
+
+    @app.get("/findings", response_class=HTMLResponse)
+    def investigations(request: Request, risk: str = "", review: str = "",
+                       q: str = "", sort: str = "priority"):
+        findings = repository.list_all_finding_groups(
+            risk=risk, review=review, q=q, sort=sort,
+        )
+        return templates.TemplateResponse(
+            request, "findings.html",
+            context(
+                request, findings=findings, risk_filter=risk,
+                review_filter=review, q_filter=q, sort_filter=sort,
+            ),
+        )
+
+    @app.get("/findings/list", response_class=HTMLResponse)
+    def investigations_list(request: Request, risk: str = "", review: str = "",
+                            q: str = "", sort: str = "priority"):
+        findings = repository.list_all_finding_groups(
+            risk=risk, review=review, q=q, sort=sort,
+        )
+        return templates.TemplateResponse(
+            request, "partials/findings_table.html",
+            context(request, findings=findings),
+        )
 
     @app.get("/findings/{finding_id}", response_class=HTMLResponse)
     def finding_detail(request: Request, finding_id: int):

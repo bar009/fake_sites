@@ -37,7 +37,7 @@
     if (!target) return;
     try {
       await navigator.clipboard.writeText(target.textContent.trim());
-      showToast("URL copied");
+      showToast(button.dataset.copyMessage || "Copied");
     } catch (_) {
       showToast("The URL could not be copied automatically", "error");
     }

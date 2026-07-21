@@ -86,6 +86,36 @@ def test_finding_metadata_grouping_targets_and_priority_refresh(tmp_path: Path):
     assert {row["priority_score"] for row in repository.list_findings(scan_id)} == {85}
 
 
+def test_dashboard_counts_domains_companies_and_scan_history(tmp_path: Path):
+    repository = Repository(tmp_path / "app.db")
+    scan_id = repository.create_scan(
+        kind="csv", provider="ddgs", top_n=3, source_name="brands.csv",
+        targets=[{"brand": "Alpha"}, {"brand": "Beta"}],
+    )
+    targets = repository.pending_targets(scan_id)
+    alpha, beta = targets
+    for domain in ("alpha-sale.shop", "alpha-outlet.shop"):
+        repository.add_finding(
+            scan_id=scan_id, brand_id=alpha["brand_id"],
+            row={"url": f"https://{domain}", "domain": domain,
+                 "registrable_domain": domain},
+            assessment={"score": 80, "level": "high", "evidence": []}, priority=80,
+        )
+    repository.add_finding(
+        scan_id=scan_id, brand_id=beta["brand_id"],
+        row={"url": "https://beta-shop.shop", "domain": "beta-shop.shop",
+             "registrable_domain": "beta-shop.shop"},
+        assessment={"score": 45, "level": "medium", "evidence": []}, priority=45,
+    )
+
+    stats = repository.dashboard_stats()
+    assert stats["findings"] == 3
+    assert stats["high_companies"] == 1
+    assert stats["pending_review_companies"] == 2
+    assert stats["scans"] == 1
+    assert len(repository.list_all_finding_groups(review="open")) == 3
+
+
 def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: Path):
     db_path = tmp_path / "app.db"
     repository = Repository(db_path)

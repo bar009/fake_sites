@@ -22,7 +22,9 @@
     <nav class="sidebar-nav">
       <span class="nav-label">Operations</span>
       <a href="/" {% if current_path == '/' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}<span>Overview</span></a>
+      <a href="/findings" {% if current_path.startswith('/findings') %}aria-current="page"{% endif %}>{{ icon('shield') }}<span>Investigations</span></a>
       <a href="/scans/new" {% if current_path == '/scans/new' %}aria-current="page"{% endif %}>{{ icon('scan') }}<span>New scan</span></a>
+      <span class="nav-label nav-label-secondary">Supporting data</span>
       <a href="/mappings" {% if current_path.startswith('/mappings') %}aria-current="page"{% endif %}>{{ icon('mapping') }}<span>Company mappings</span></a>
     </nav>
     <div class="sidebar-note">{{ icon('shield', 20) }}<p><strong>Local research environment</strong><small>Suspect URLs are never presented as clickable links.</small></p></div>
