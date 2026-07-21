@@ -33,13 +33,31 @@ class Capturer:
     """One shared browser process; a fresh isolated context per URL."""
 
     def __enter__(self):
-        self._pw = sync_playwright().start()
-        self._browser = self._pw.chromium.launch(headless=True)
+        self._pw = None
+        self._browser = None
         return self
 
+    def _ensure_browser(self) -> None:
+        if self._browser is not None:
+            return
+        self._pw = sync_playwright().start()
+        self._browser = self._pw.chromium.launch(headless=True)
+
+    def close(self) -> None:
+        """Release Playwright so non-browser network clients can run cleanly.
+
+        Playwright's sync driver and ddgs interfere when used sequentially in
+        the same background thread. The next capture starts Chromium lazily.
+        """
+        if self._browser is not None:
+            self._browser.close()
+            self._browser = None
+        if self._pw is not None:
+            self._pw.stop()
+            self._pw = None
+
     def __exit__(self, *exc):
-        self._browser.close()
-        self._pw.stop()
+        self.close()
         return False
 
     def capture(self, url: str, screenshot_path: Path) -> CaptureResult:
@@ -50,6 +68,7 @@ class Capturer:
             result.error = f"UnsafeUrlError: {exc}"
             return result
 
+        self._ensure_browser()
         context = self._browser.new_context(
             user_agent=USER_AGENT,
             viewport={"width": 1366, "height": 900},

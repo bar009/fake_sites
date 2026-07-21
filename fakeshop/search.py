@@ -13,7 +13,7 @@ import requests
 
 # Primary storefront-template fingerprint. Keep this exact phrase quoted so the
 # search engine does not turn it into a broad customer-review query.
-QUERY_TEMPLATE = 'site:.shop "What Our Customer Say" {brand_clause}'
+QUERY_TEMPLATE = 'site:.shop "What Our Customers Say" {brand_clause}'
 
 # Search engines treat quoted names literally. These canonical names cover
 # brands whose commonly typed/domain form differs from the printed brand name.
@@ -22,7 +22,9 @@ BRAND_ALIASES = {
 }
 
 MAX_ATTEMPTS = 3
-DDGS_BACKENDS = ("duckduckgo", "yahoo")
+# Yahoo currently indexes the exact storefront phrase more consistently. Keep
+# DuckDuckGo as the no-key fallback for brands that Yahoo does not return.
+DDGS_BACKENDS = ("yahoo", "duckduckgo")
 
 
 @dataclass
@@ -76,7 +78,11 @@ class DdgsProvider:
                         title=r.get("title", ""),
                         snippet=r.get("body", "") or r.get("snippet", ""),
                     ))
-                return results
+                # Some backends occasionally return placeholder records with
+                # no URL. They are not real hits; continue to the fallback
+                # backend instead of reporting an empty successful search.
+                if results:
+                    return results
             except Exception as e:  # noqa: BLE001 - rate limits surface as generic errors
                 # A backend with no hits is not a scan failure. Try the next
                 # no-key backend because their indexes differ substantially.

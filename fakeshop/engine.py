@@ -34,6 +34,10 @@ class ScanEngine:
 
     def scan_brand(self, brand: str, *, top: int, screenshot_dir: Path,
                    capturer: Capturer) -> list[dict]:
+        # ddgs can return an empty set when Playwright's sync driver is active
+        # in this background thread. Stop it for the search; capture() starts it
+        # lazily again only when there are actual hits to inspect.
+        capturer.close()
         query = build_query(brand)
         results = [
             hit for hit in self.provider.search(query, top=top)
