@@ -92,6 +92,8 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert investigations.status_code == 200
         assert "Priority belongs to the company; risk belongs to the website" in investigations.text
         assert "Company priority" in investigations.text
+        assert "<p>Example</p>" not in investigations.text
+        assert "Example · 1 captured page" not in investigations.text
         assert f'href="/findings/{finding_id}"' in investigations.text
         assert "https://example-sale.shop/path" in investigations.text
         assert f'src="/findings/{finding_id}/screenshot"' in investigations.text

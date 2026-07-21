@@ -4,7 +4,7 @@
   {% for company in companies %}
   <section class="company-investigation" id="company-{{ company.anchor_id }}">
     <header class="company-investigation-header">
-      <div class="company-heading"><span class="company-letter">{{ company.company_name[:1]|upper }}</span><div><span class="section-kicker">Company</span><h3>{{ company.company_name }}</h3><p>{% if company.brands|length > 1 %}Brands: {{ company.brands|join(', ') }}{% else %}{{ company.brands[0] }}{% endif %}{% if company.ticker %} · {{ company.ticker }}{% endif %}</p></div></div>
+      <div class="company-heading"><span class="company-letter">{{ company.company_name[:1]|upper }}</span><div><span class="section-kicker">Company</span><h3>{{ company.company_name }}</h3>{% set same_single_brand = company.brands|length == 1 and company.brands[0]|lower == company.company_name|lower %}{% if not same_single_brand or company.ticker %}<p>{% if company.brands|length > 1 %}Brands: {{ company.brands|join(', ') }}{% elif not same_single_brand %}Brand: {{ company.brands[0] }}{% endif %}{% if company.ticker %}{% if not same_single_brand %} · {% endif %}{{ company.ticker }}{% endif %}</p>{% endif %}</div></div>
       <div class="company-metrics" aria-label="Company investigation metrics">
         <div><span>Company priority</span><strong>{{ company.priority_score }}<small>/100</small></strong></div>
         <div><span>Domains</span><strong>{{ company.domain_count }}</strong></div>
@@ -19,7 +19,7 @@
         <span>{{ risk_badge(finding.risk_level, finding.risk_score) }}</span>
         <span class="finding-identity">
           {% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="Screenshot of {{ finding.registrable_domain or finding.domain }}" loading="lazy">{% else %}<span class="thumb-placeholder">{{ icon('shield', 18) }}</span>{% endif %}
-          <span><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · {{ finding.page_count }} captured page{% if finding.page_count != 1 %}s{% endif %}</small><code class="finding-safe-url">{{ finding.url }}</code></span>
+          <span><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{% if finding.brand|lower != company.company_name|lower %}{{ finding.brand }} · {% endif %}{{ finding.page_count }} captured page{% if finding.page_count != 1 %}s{% endif %}</small><code class="finding-safe-url">{{ finding.url }}</code></span>
         </span>
         <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</span>
         <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>signals</small></span>
