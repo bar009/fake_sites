@@ -1,6 +1,20 @@
 {% extends "base.html" %}
+{% from "macros/ui.html" import icon, kpi %}
 {% block title %}מיפוי חברות — Fake Shop Checker{% endblock %}
 {% block content %}
-<section class="page-intro"><span class="eyebrow">Company intelligence</span><h1>מיפוי חברות</h1><p>התאמות חד־משמעיות נשמרות אוטומטית. כאן מאשרים מקרים עמומים בלי להשפיע על ציון החשד.</p></section>
-<div class="mapping-list">{% for mapping in mappings %}<article class="mapping-row"><div class="mapping-brand"><strong>{{ mapping.brand }}</strong><small>{{ mapping.topic or 'ללא נושא' }}</small></div><span class="pill mapping-{{ mapping.status or 'pending' }}">{{ {'auto_confirmed':'אוטומטי','confirmed':'מאושר','needs_review':'דורש אישור','no_match':'לא נמצאה חברה','unavailable':'לא זמין','pending':'טרם נבדק'}.get(mapping.status or 'pending', mapping.status) }}</span><div class="mapping-company"><strong>{{ mapping.parent_company or '—' }}</strong><small dir="ltr">{{ mapping.ticker or '' }} · {{ mapping.market_cap_usd|money }}</small></div>{% if mapping.candidates %}<details><summary>בחירת התאמה</summary><div class="candidate-list">{% for candidate in mapping.candidates %}<form method="post" action="/mappings/{{ mapping.brand_id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="ticker" value="{{ candidate.ticker }}"><input type="hidden" name="company_name" value="{{ candidate.name }}"><span><strong>{{ candidate.name }}</strong><small dir="ltr">{{ candidate.ticker }} · {{ candidate.exchange }} · {{ (candidate.score*100)|round|int }}%</small></span><button class="button button-quiet" type="submit">אישור</button></form>{% endfor %}</div></details>{% endif %}</article>{% else %}<div class="empty-state"><strong>אין עדיין מותגים</strong><p>מיפויים יופיעו לאחר התחלת סריקה.</p></div>{% endfor %}</div>
+<header class="page-header"><div><span class="section-kicker">Company intelligence</span><h1>מיפוי חברות</h1><p>אישור התאמה מעדכן מיד את ציון העדיפות בכל הממצאים ההיסטוריים של המותג.</p></div></header>
+<section class="kpi-grid mapping-kpis">
+  {{ kpi('כל המותגים', mapping_stats.total, 'מיפויים שנוצרו', 'mapping', 'blue') }}
+  {{ kpi('מאושרים', mapping_stats.confirmed, 'ידני או אוטומטי', 'shield', 'cyan') }}
+  {{ kpi('דורשים אישור', mapping_stats.needs_review, 'התאמות עמומות', 'alert', 'amber') }}
+  {{ kpi('ללא התאמה', mapping_stats.no_match, 'פרטי או לא זמין', 'search', 'gray') }}
+</section>
+<section class="dashboard-section">
+  <form class="results-toolbar" method="get" action="/mappings" hx-get="/mappings/list" hx-target="#mappings-results" hx-push-url="/mappings" hx-trigger="change, submit">
+    <label class="search-field"><span class="sr-only">חיפוש</span>{{ icon('search', 17) }}<input name="q" value="{{ q_filter }}" placeholder="חיפוש מותג, חברה או טיקר"></label>
+    <label><span class="sr-only">סטטוס</span><select name="status"><option value="">כל הסטטוסים</option><option value="needs_review" {% if status_filter=='needs_review' %}selected{% endif %}>דורש אישור</option><option value="confirmed" {% if status_filter=='confirmed' %}selected{% endif %}>מאושר</option><option value="auto_confirmed" {% if status_filter=='auto_confirmed' %}selected{% endif %}>אוטומטי</option><option value="no_match" {% if status_filter=='no_match' %}selected{% endif %}>ללא התאמה</option><option value="unavailable" {% if status_filter=='unavailable' %}selected{% endif %}>לא זמין</option></select></label>
+    <button class="button button-quiet" type="submit">עדכון</button>
+  </form>
+  {% include "partials/mappings_list.html" %}
+</section>
 {% endblock %}

@@ -1,10 +1,31 @@
 {% extends "base.html" %}
+{% from "macros/ui.html" import icon, status_badge %}
 {% block title %}סריקה #{{ scan.id }} — Fake Shop Checker{% endblock %}
 {% block content %}
-<div class="detail-head"><div><span class="eyebrow">Investigation #{{ scan.id }}</span><h1>{{ scan.source_name or 'סריקה' }}</h1><p>{{ scan.created_at }} · {{ scan.kind }} · ספק {{ scan.provider }}</p></div><div class="actions"><a class="button button-quiet" href="/scans/{{ scan.id }}/export/json">JSON</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/xlsx">Excel</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/html">HTML</a></div></div>
+<header class="page-header scan-page-header">
+  <div><a class="back-link" href="/">→ חזרה ללוח הבקרה</a><span class="section-kicker">Investigation #{{ scan.id }}</span><h1>{{ scan.source_name or 'סריקה' }}</h1><p>{{ scan.created_at }} · {{ scan.kind }} · ספק {{ scan.provider }}</p></div>
+  <div class="export-actions"><span>ייצוא ראיות גולמיות</span><div><a class="button button-quiet" href="/scans/{{ scan.id }}/export/json">JSON</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/xlsx">Excel</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/html">HTML</a></div></div>
+</header>
 {% include "partials/scan_status.html" %}
-<section class="section-heading compact"><div><span class="eyebrow">Evidence queue</span><h2>{{ findings|length }} ממצאים</h2></div></section>
-<form class="filter-bar" method="get"><label>רמת סיכון<select name="risk"><option value="">הכול</option><option value="high" {% if risk_filter=='high' %}selected{% endif %}>גבוה</option><option value="medium" {% if risk_filter=='medium' %}selected{% endif %}>בינוני</option><option value="low" {% if risk_filter=='low' %}selected{% endif %}>נמוך</option></select></label><label>סטטוס סקירה<select name="review"><option value="">הכול</option><option value="unreviewed" {% if review_filter=='unreviewed' %}selected{% endif %}>לא נבדק</option><option value="confirmed" {% if review_filter=='confirmed' %}selected{% endif %}>חשוד מאומת</option><option value="false_positive" {% if review_filter=='false_positive' %}selected{% endif %}>False positive</option><option value="investigate" {% if review_filter=='investigate' %}selected{% endif %}>דורש חקירה</option></select></label><button class="button button-secondary" type="submit">סינון</button></form>
-{% if findings %}<div class="finding-grid">{% for finding in findings %}<a class="finding-card risk-{{ finding.risk_level }}" href="/findings/{{ finding.id }}"><div class="finding-top"><span class="risk-orb">{{ finding.risk_score }}</span><div><small>{{ finding.brand }} · {{ finding.topic or 'ללא נושא' }}</small><h3 dir="ltr">{{ finding.domain }}</h3></div><span class="priority">עדיפות {{ finding.priority_score }}</span></div>{% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="צילום מסך של {{ finding.domain }}" loading="lazy">{% else %}<div class="no-shot">צילום מסך לא זמין</div>{% endif %}<div class="finding-bottom"><span>{{ finding.evidence|length }} אותות</span><span>{{ finding.parent_company or 'חברה לא ממופה' }}</span><span>{{ finding.market_cap_usd|money }}</span></div></a>{% endfor %}</div>{% else %}<div class="empty-state"><strong>אין ממצאים להצגה</strong><p>{% if scan.status in active_statuses %}הסריקה עדיין עובדת. התוצאות יופיעו כאן.{% else %}נסו להסיר את המסננים או להריץ סריקה אחרת.{% endif %}</p></div>{% endif %}
+
+<section class="dashboard-section targets-section">
+  <div class="section-heading"><div><span class="section-kicker">Target health</span><h2>יעדי סריקה</h2></div><small>{{ targets|length }} יעדים · {{ page_count }} עמודי ראיות</small></div>
+  <div class="target-table" role="table" aria-label="סטטוס יעדי הסריקה">
+    <div class="target-head" role="row"><span>מותג</span><span>סטטוס</span><span>דומיינים</span><span>עמודים</span><span>שגיאה</span></div>
+    {% for target in targets %}<div class="target-row" role="row"><strong>{{ target.brand }}</strong><span>{{ status_badge(target.display_status) }}</span><span>{{ target.domain_count }}</span><span>{{ target.page_count }}</span><span class="target-error">{{ target.error or '—' }}</span></div>{% endfor %}
+  </div>
+</section>
+
+<section class="dashboard-section findings-section">
+  <div class="section-heading"><div><span class="section-kicker">Evidence queue</span><h2>ממצאים לפי דומיין</h2></div><small>עמודים מאותו דומיין מקובצים יחד</small></div>
+  <form class="results-toolbar" method="get" action="/scans/{{ scan.id }}" hx-get="/scans/{{ scan.id }}/findings" hx-target="#findings-results" hx-push-url="/scans/{{ scan.id }}" hx-trigger="change, submit">
+    <label class="search-field"><span class="sr-only">חיפוש</span>{{ icon('search', 17) }}<input name="q" value="{{ q_filter }}" placeholder="חיפוש דומיין או מותג"></label>
+    <label><span class="sr-only">סיכון</span><select name="risk"><option value="">כל הסיכונים</option><option value="high" {% if risk_filter=='high' %}selected{% endif %}>גבוה</option><option value="medium" {% if risk_filter=='medium' %}selected{% endif %}>בינוני</option><option value="low" {% if risk_filter=='low' %}selected{% endif %}>נמוך</option></select></label>
+    <label><span class="sr-only">סקירה</span><select name="review"><option value="">כל הסטטוסים</option><option value="unreviewed" {% if review_filter=='unreviewed' %}selected{% endif %}>לא נבדק</option><option value="confirmed" {% if review_filter=='confirmed' %}selected{% endif %}>חשוד מאומת</option><option value="false_positive" {% if review_filter=='false_positive' %}selected{% endif %}>False positive</option><option value="investigate" {% if review_filter=='investigate' %}selected{% endif %}>דורש חקירה</option></select></label>
+    <label><span class="sr-only">מיון</span><select name="sort"><option value="priority" {% if sort_filter=='priority' %}selected{% endif %}>עדיפות</option><option value="risk" {% if sort_filter=='risk' %}selected{% endif %}>סיכון</option><option value="date" {% if sort_filter=='date' %}selected{% endif %}>תאריך</option><option value="domain" {% if sort_filter=='domain' %}selected{% endif %}>דומיין</option></select></label>
+    <button class="button button-quiet" type="submit">עדכון</button>
+  </form>
+  {% include "partials/findings_table.html" %}
+</section>
 {% if scan.status not in active_statuses %}<form class="danger-zone" method="post" action="/scans/{{ scan.id }}/delete" data-confirm="למחוק את הסריקה ואת צילומי המסך שלה?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-danger" type="submit">מחיקת הסריקה</button></form>{% endif %}
 {% endblock %}

@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from fakeshop.capture import Capturer
 from fakeshop.search import build_query, get_provider
-from fakeshop.whois_check import WhoisChecker, domain_of
+from fakeshop.whois_check import WhoisChecker, domain_of, registrable_domain
 
 
 STATIC_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".svg", ".ico",
@@ -39,10 +39,17 @@ class ScanEngine:
         # lazily again only when there are actual hits to inspect.
         capturer.close()
         query = build_query(brand)
-        results = [
-            hit for hit in self.provider.search(query, top=top)
-            if domain_of(hit.url).endswith(".shop")
-        ]
+        results = []
+        seen_domains = set()
+        for hit in self.provider.search(query, top=min(top * 3, 30)):
+            host = domain_of(hit.url)
+            registered = registrable_domain(host)
+            if not host.endswith(".shop") or not registered or registered in seen_domains:
+                continue
+            seen_domains.add(registered)
+            results.append(hit)
+            if len(results) >= top:
+                break
         rows = []
         for rank, hit in enumerate(results, start=1):
             rows.append(self._inspect(
@@ -86,6 +93,7 @@ class ScanEngine:
             "search_title": search_title,
             "search_snippet": search_snippet,
             "domain": domain,
+            "registrable_domain": registrable_domain(domain),
             "domain_created": info.created,
             "domain_age_days": info.age_days,
             "registrar": info.registrar,

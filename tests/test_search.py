@@ -1,4 +1,4 @@
-from fakeshop.search import DdgsProvider, build_query
+from fakeshop.search import DdgsProvider, SearchResult, build_query
 from fakeshop.engine import ScanEngine
 
 
@@ -43,7 +43,7 @@ def test_brand_search_closes_playwright_before_using_provider(tmp_path):
     class FakeProvider:
         def search(self, _query, top):
             assert capturer.closed
-            assert top == 3
+            assert top == 9
             return []
 
     engine = ScanEngine.__new__(ScanEngine)
@@ -52,3 +52,28 @@ def test_brand_search_closes_playwright_before_using_provider(tmp_path):
     assert engine.scan_brand(
         "Duck Camp", top=3, screenshot_dir=tmp_path, capturer=capturer,
     ) == []
+
+
+def test_brand_search_deduplicates_pages_by_registrable_domain(tmp_path):
+    class FakeCapturer:
+        def close(self):
+            pass
+
+    class FakeProvider:
+        def search(self, _query, top):
+            assert top == 6
+            return [
+                SearchResult("https://deal.example.shop/", "First", ""),
+                SearchResult("https://example.shop/collections/sale", "Second", ""),
+                SearchResult("https://other.shop/", "Third", ""),
+            ]
+
+    engine = ScanEngine.__new__(ScanEngine)
+    engine.provider = FakeProvider()
+    engine._inspect = lambda **values: values
+    rows = engine.scan_brand(
+        "Example", top=2, screenshot_dir=tmp_path, capturer=FakeCapturer(),
+    )
+    assert [row["url"] for row in rows] == [
+        "https://deal.example.shop/", "https://other.shop/",
+    ]

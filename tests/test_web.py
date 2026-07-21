@@ -52,3 +52,35 @@ def test_csv_upload_and_url_validation(monkeypatch, tmp_path: Path):
             follow_redirects=False,
         )
         assert direct.status_code == 303
+
+
+def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
+    app = web.create_app(tmp_path, start_worker=False)
+    repository = app.state.repository
+    scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Example",
+        targets=[{"brand": "Example", "official_domain": "example.com"}],
+    )
+    target = repository.pending_targets(scan_id)[0]
+    finding_id = repository.add_finding(
+        scan_id=scan_id, brand_id=target["brand_id"],
+        row={"url": "https://example-sale.shop/path", "domain": "example-sale.shop",
+             "registrable_domain": "example-sale.shop", "query": "site:.shop query",
+             "search_title": "Search title", "search_snippet": "Search snippet",
+             "page_title": "Page title", "final_url": "https://redirect.shop/"},
+        assessment={"score": 80, "level": "high", "evidence": []}, priority=80,
+    )
+    with TestClient(app) as client:
+        dashboard = client.get("/")
+        assert "/static/vendor/htmx.min.js" in dashboard.text
+        assert "unpkg.com" not in dashboard.text
+        assert "https://unpkg.com" not in dashboard.headers["content-security-policy"]
+        filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
+        assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
+        partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})
+        assert "אין ממצאים מתאימים" in partial.text
+        detail = client.get(f"/findings/{finding_id}")
+        assert "site:.shop query" in detail.text
+        assert "Search snippet" in detail.text
+        assert "example.com" in detail.text
+        assert '<a href="https://example-sale.shop' not in detail.text

@@ -1,0 +1,27 @@
+{% from "macros/ui.html" import icon, risk_badge, status_badge %}
+<div id="findings-results" class="results-panel">
+  <div class="results-summary"><strong>{{ findings|length }}</strong> דומיינים מוצגים</div>
+  {% if findings %}
+  <div class="finding-table" role="table" aria-label="ממצאי הסריקה">
+    <div class="finding-table-head" role="row">
+      <span>סיכון</span><span>דומיין ומותג</span><span>גיל</span><span>ראיות</span><span>עדיפות</span><span>סקירה</span><span></span>
+    </div>
+    {% for finding in findings %}
+    <a class="finding-row" href="/findings/{{ finding.id }}" role="row">
+      <span>{{ risk_badge(finding.risk_level, finding.risk_score) }}</span>
+      <span class="finding-identity">
+        {% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="" loading="lazy">{% else %}<span class="thumb-placeholder">{{ icon('shield', 18) }}</span>{% endif %}
+        <span><strong dir="ltr">{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · {{ finding.page_count }} עמודים</small></span>
+      </span>
+      <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} ימים{% else %}לא ידוע{% endif %}</span>
+      <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>אותות</small></span>
+      <span class="priority-score">{{ finding.priority_score }}</span>
+      <span>{{ status_badge(finding.review_status) }}</span>
+      <span class="row-arrow">{{ icon('chevron', 17) }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-panel"><span>{{ icon('search', 24) }}</span><strong>אין ממצאים מתאימים</strong><p>נסו לשנות את החיפוש או להסיר מסנן.</p></div>
+  {% endif %}
+</div>

@@ -1,3 +1,5 @@
+import json
+import sqlite3
 from pathlib import Path
 
 from fakeshop.db import Repository
@@ -41,3 +43,76 @@ def test_interrupted_scan_can_resume(tmp_path: Path):
     assert repository.get_scan(scan_id)["status"] == "interrupted"
     assert repository.resume_scan(scan_id)
     assert repository.get_scan(scan_id)["status"] == "queued"
+
+
+def test_finding_metadata_grouping_targets_and_priority_refresh(tmp_path: Path):
+    repository = Repository(tmp_path / "app.db")
+    scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=3, source_name="Duck Camp",
+        targets=[{"brand": "DUCKCAMP", "official_domain": "duckcamp.com"}],
+    )
+    target = repository.pending_targets(scan_id)[0]
+    for rank, url in enumerate(("https://deal.example.shop/", "https://example.shop/sale"), 1):
+        repository.add_finding(
+            scan_id=scan_id, brand_id=target["brand_id"],
+            row={"rank": rank, "url": url, "domain": url.split("/")[2],
+                 "registrable_domain": "example.shop", "query": "site:.shop query",
+                 "search_title": f"Hit {rank}", "search_snippet": "snippet",
+                 "final_url": url, "page_title": f"Page {rank}", "note": "captured"},
+            assessment={"score": 80, "level": "high", "evidence": []}, priority=80,
+        )
+    repository.set_target_status(target["id"], "completed")
+
+    groups = repository.list_finding_groups(scan_id)
+    assert len(groups) == 1 and groups[0]["page_count"] == 2
+    finding = repository.get_finding(groups[0]["id"])
+    assert finding["search_query"] == "site:.shop query"
+    assert finding["capture_note"] == "captured"
+    assert finding["official_domain"] == "duckcamp.com"
+    assert repository.list_scan_targets(scan_id)[0]["domain_count"] == 1
+
+    repository.save_mapping(
+        target["brand_id"], parent_company="Duck Camp", ticker="DUCK",
+        status="confirmed", market_cap_usd=150_000_000_000,
+        finance_source="yfinance", finance_fetched_at="2026-07-22T00:00:00Z",
+    )
+    assert {row["priority_score"] for row in repository.list_findings(scan_id)} == {85}
+
+
+def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: Path):
+    db_path = tmp_path / "app.db"
+    repository = Repository(db_path)
+    first = repository.upsert_brand({"brand": "DUCK CAMP", "topic": "outdoors"})
+    with sqlite3.connect(db_path) as connection:
+        second = connection.execute(
+            "INSERT INTO brands(name, normalized_name, official_domain) VALUES (?,?,?)",
+            ("DUCKCAMP", "duckcamp-legacy", "duckcamp.com"),
+        ).lastrowid
+        scan_id = connection.execute(
+            "INSERT INTO scan_runs(kind,status,created_at) VALUES ('brand','completed','now')"
+        ).lastrowid
+        target_id = connection.execute(
+            "INSERT INTO scan_targets(scan_id,brand_id,status) VALUES (?,?,'completed')",
+            (scan_id, second),
+        ).lastrowid
+        finding_id = connection.execute(
+            "INSERT INTO findings(scan_id,brand_id,url,domain,created_at) VALUES (?,?,?,?,?)",
+            (scan_id, second, "https://duckcamp-sale.shop", "duckcamp-sale.shop", "now"),
+        ).lastrowid
+        connection.execute(
+            "INSERT INTO company_mappings(brand_id,parent_company,ticker,status,candidates_json) VALUES (?,?,?,?,?)",
+            (second, "Duck Camp", "DUCK", "confirmed", json.dumps([{"ticker": "DUCK"}])),
+        )
+        connection.execute("PRAGMA user_version=1")
+
+    migrated = Repository(db_path)
+    with migrated.connect() as connection:
+        brands = connection.execute("SELECT * FROM brands").fetchall()
+        assert len(brands) == 1
+        assert brands[0]["id"] == first and brands[0]["name"] == "Duck Camp"
+        assert brands[0]["official_domain"] == "duckcamp.com"
+        assert connection.execute("SELECT brand_id FROM scan_targets WHERE id=?", (target_id,)).fetchone()[0] == first
+        assert connection.execute("SELECT brand_id FROM findings WHERE id=?", (finding_id,)).fetchone()[0] == first
+        assert connection.execute("SELECT status FROM company_mappings WHERE brand_id=?", (first,)).fetchone()[0] == "confirmed"
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert list((tmp_path / "backups").glob("app-v1-*.db"))

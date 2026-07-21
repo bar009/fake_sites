@@ -1,46 +1,64 @@
 {% extends "base.html" %}
+{% from "macros/ui.html" import icon, kpi, risk_badge, status_badge %}
 {% block title %}לוח בקרה — Fake Shop Checker{% endblock %}
 {% block content %}
-<section class="hero">
-  <div>
-    <span class="eyebrow">Threat intelligence · סביבת מחקר מקומית</span>
-    <h1>מוצאים התחזויות<br><span>לפני שהן מוצאות לקוחות.</span></h1>
-    <p>סריקה ממוקדת של אתרי <span dir="ltr">.shop</span>, דירוג ראייתי וצילומי מסך בטוחים — במקום לפתוח קישורים עוינים.</p>
-    <a class="button button-primary button-large" href="/scans/new">התחלת סריקה</a>
+<header class="page-header">
+  <div><span class="section-kicker">Security operations</span><h1>לוח בקרה</h1><p>ממצאים דחופים, סריקות פעילות ותמונת מצב עדכנית.</p></div>
+  <a class="button button-primary" href="/scans/new">{{ icon('scan', 17) }} סריקה חדשה</a>
+</header>
+
+<section class="kpi-grid" aria-label="מדדי מערכת">
+  {{ kpi('דומיינים ייחודיים', stats.findings, 'לפי דומיין רשום', 'shield', 'blue') }}
+  {{ kpi('סיכון גבוה', stats.high, 'דורשים תשומת לב', 'alert', 'red') }}
+  {{ kpi('ממתינים לסקירה', stats.pending_review, 'טרם נבדקו אנושית', 'activity', 'amber') }}
+  {{ kpi('סריקות', stats.scans, 'בכל ההיסטוריה', 'scan', 'cyan') }}
+</section>
+
+{% if active_scans %}
+<section class="dashboard-section">
+  <div class="section-heading"><div><span class="section-kicker">Live queue</span><h2>סריקות פעילות</h2></div><span class="section-count">{{ active_scans|length }}</span></div>
+  <div class="active-grid">
+    {% for scan in active_scans %}
+    <a class="active-scan-card" href="/scans/{{ scan.id }}">
+      <div><span class="pulse-dot"></span>{{ status_badge(scan.status) }}</div>
+      <strong>{{ scan.source_name or scan.kind }}</strong>
+      <small>{{ scan.progress_current }} מתוך {{ scan.progress_total }} יעדים</small>
+      <span class="progress-track"><i style="width:{{ (scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0 }}%"></i></span>
+    </a>
+    {% endfor %}
   </div>
-  <div class="signal-panel" aria-label="עקרונות המערכת">
-    <div><b>01</b><span>גילוי</span><small>חיפוש לפי חתימת תבנית</small></div>
-    <div><b>02</b><span>אימות</span><small>דומיין, תוכן והפניות</small></div>
-    <div><b>03</b><span>תעדוף</span><small>סיכון והשפעה עסקית</small></div>
-  </div>
 </section>
-
-<section class="stat-grid" aria-label="נתוני מערכת">
-  <article><span>סריקות</span><strong>{{ stats.scans }}</strong><small>כל ההיסטוריה</small></article>
-  <article><span>ממצאים</span><strong>{{ stats.findings }}</strong><small>אתרים שנבדקו</small></article>
-  <article class="danger-stat"><span>סיכון גבוה</span><strong>{{ stats.high }}</strong><small>דורשים תשומת לב</small></article>
-  <article><span>אומתו</span><strong>{{ stats.confirmed }}</strong><small>בסקירה אנושית</small></article>
-</section>
-
-<section class="section-heading">
-  <div><span class="eyebrow">Activity</span><h2>סריקות אחרונות</h2></div>
-  <a href="/scans/new" class="text-link">סריקה חדשה ←</a>
-</section>
-
-{% if scans %}
-<div class="scan-list">
-  {% for scan in scans %}
-  <a href="/scans/{{ scan.id }}" class="scan-row">
-    <span class="scan-id">#{{ scan.id }}</span>
-    <span class="scan-main"><strong>{{ scan.source_name or scan.kind }}</strong><small>{{ scan.created_at }}</small></span>
-    <span class="pill status-{{ scan.status }}">{{ {'queued':'בתור','running':'פעילה','completed':'הושלמה','cancelled':'נעצרה','failed':'נכשלה','interrupted':'הופסקה'}[scan.status] }}</span>
-    <span class="scan-metric"><b>{{ scan.finding_count }}</b><small>ממצאים</small></span>
-    <span class="scan-metric danger-text"><b>{{ scan.high_count }}</b><small>גבוהים</small></span>
-    <span class="arrow">←</span>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="empty-state"><strong>אין עדיין סריקות</strong><p>התחילו עם CSV, מותג או כתובת אתר אחת.</p><a class="button button-primary" href="/scans/new">לסריקה הראשונה</a></div>
 {% endif %}
+
+<div class="dashboard-grid">
+  <section class="dashboard-section urgent-section">
+    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>ממצאים דחופים</h2></div><small>לא כולל False positive</small></div>
+    {% if urgent_findings %}
+    <div class="urgent-list">
+      {% for finding in urgent_findings %}
+      <a class="urgent-row" href="/findings/{{ finding.id }}">
+        {{ risk_badge(finding.risk_level, finding.risk_score) }}
+        <span class="urgent-identity"><strong dir="ltr">{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · עדיפות {{ finding.priority_score }}</small></span>
+        {{ status_badge(finding.review_status) }}
+        {{ icon('chevron', 17) }}
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>אין ממצאים דחופים</strong><p>ממצאים בסיכון גבוה יופיעו כאן.</p></div>{% endif %}
+  </section>
+
+  <section class="dashboard-section recent-section">
+    <div class="section-heading"><div><span class="section-kicker">Recent activity</span><h2>סריקות אחרונות</h2></div><a href="/scans/new">חדשה ←</a></div>
+    {% if scans %}<div class="recent-list">
+      {% for scan in scans[:6] %}
+      <a class="recent-row" href="/scans/{{ scan.id }}">
+        <span class="scan-number">#{{ scan.id }}</span>
+        <span><strong>{{ scan.source_name or scan.kind }}</strong><small>{{ scan.created_at }}</small></span>
+        {{ status_badge(scan.status) }}
+        <span class="recent-metric"><strong>{{ scan.finding_count }}</strong><small>דומיינים</small></span>
+      </a>
+      {% endfor %}
+    </div>{% else %}<div class="empty-panel compact"><strong>אין עדיין סריקות</strong><p>התחילו עם CSV, מותג או URL.</p><a class="button button-primary" href="/scans/new">לסריקה הראשונה</a></div>{% endif %}
+  </section>
+</div>
 {% endblock %}

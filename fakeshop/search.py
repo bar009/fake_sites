@@ -11,15 +11,11 @@ from dataclasses import dataclass
 
 import requests
 
+from fakeshop.brand_identity import canonical_brand_name
+
 # Primary storefront-template fingerprint. Keep this exact phrase quoted so the
 # search engine does not turn it into a broad customer-review query.
 QUERY_TEMPLATE = 'site:.shop "What Our Customers Say" {brand_clause}'
-
-# Search engines treat quoted names literally. These canonical names cover
-# brands whose commonly typed/domain form differs from the printed brand name.
-BRAND_ALIASES = {
-    "duckcamp": "Duck Camp",
-}
 
 MAX_ATTEMPTS = 3
 # Yahoo currently indexes the exact storefront phrase more consistently. Keep
@@ -35,9 +31,7 @@ class SearchResult:
 
 
 def build_query(brand: str) -> str:
-    brand = " ".join(brand.split())
-    normalised = "".join(char for char in brand.lower() if char.isalnum())
-    search_name = BRAND_ALIASES.get(normalised, brand).replace('"', "")
+    search_name = canonical_brand_name(brand).replace('"', "")
     brand_clause = f'"{search_name}"'
     return QUERY_TEMPLATE.format(brand_clause=brand_clause)
 

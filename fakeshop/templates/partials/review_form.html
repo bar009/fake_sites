@@ -1,0 +1,8 @@
+{% from "macros/ui.html" import status_badge %}
+<form id="review-card" class="panel-card review-form" method="post" action="/findings/{{ finding.id }}/review" hx-post="/findings/{{ finding.id }}/review" hx-target="#review-card" hx-swap="outerHTML">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="panel-title"><div><span class="section-kicker">Analyst review</span><h2>החלטת חוקר</h2></div>{{ status_badge(finding.review_status) }}</div>
+  <label>סטטוס<select name="review_status"><option value="unreviewed" {% if finding.review_status=='unreviewed' %}selected{% endif %}>לא נבדק</option><option value="confirmed" {% if finding.review_status=='confirmed' %}selected{% endif %}>חשוד מאומת</option><option value="false_positive" {% if finding.review_status=='false_positive' %}selected{% endif %}>False positive</option><option value="investigate" {% if finding.review_status=='investigate' %}selected{% endif %}>דורש חקירה</option></select></label>
+  <label>הערה<textarea name="review_note" rows="5" maxlength="2000" placeholder="ראיות, הקשר והחלטה...">{{ finding.review_note }}</textarea></label>
+  <button class="button button-primary" type="submit">שמירת סקירה</button>
+</form>

@@ -107,7 +107,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self' https://unpkg.com; "
+            "default-src 'self'; script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
         )
         return response
@@ -116,7 +116,8 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         return {
             "request": request,
             "csrf_token": csrf_token,
-            "finance_updated": repository.latest_finance_update(),
+            "finance_status": repository.finance_status(),
+            "current_path": request.url.path,
             **values,
         }
 
@@ -147,7 +148,10 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     def dashboard(request: Request):
         return templates.TemplateResponse(
             request, "dashboard.html",
-            context(request, scans=repository.list_scans(), stats=repository.dashboard_stats()),
+            context(
+                request, scans=repository.list_scans(), stats=repository.dashboard_stats(),
+                active_scans=repository.active_scans(), urgent_findings=repository.urgent_findings(),
+            ),
         )
 
     @app.get("/favicon.ico", include_in_schema=False)
@@ -214,15 +218,36 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         return RedirectResponse(f"/scans/{scan_id}", status_code=303)
 
     @app.get("/scans/{scan_id}", response_class=HTMLResponse)
-    def scan_detail(request: Request, scan_id: int, risk: str = "", review: str = ""):
+    def scan_detail(request: Request, scan_id: int, risk: str = "", review: str = "",
+                    q: str = "", sort: str = "priority"):
         scan = repository.get_scan(scan_id)
         if not scan:
             raise HTTPException(404)
-        findings = repository.list_findings(scan_id, risk=risk, review=review)
+        findings = repository.list_finding_groups(
+            scan_id, risk=risk, review=review, q=q, sort=sort,
+        )
+        raw_findings = repository.list_findings(scan_id)
         return templates.TemplateResponse(
             request, "scan_detail.html",
-            context(request, scan=scan, findings=findings, risk_filter=risk, review_filter=review,
-                    active_statuses=ACTIVE_STATUSES),
+            context(
+                request, scan=scan, findings=findings, page_count=len(raw_findings),
+                targets=repository.list_scan_targets(scan_id), risk_filter=risk,
+                review_filter=review, q_filter=q, sort_filter=sort,
+                active_statuses=ACTIVE_STATUSES,
+            ),
+        )
+
+    @app.get("/scans/{scan_id}/findings", response_class=HTMLResponse)
+    def scan_findings(request: Request, scan_id: int, risk: str = "", review: str = "",
+                      q: str = "", sort: str = "priority"):
+        if not repository.get_scan(scan_id):
+            raise HTTPException(404)
+        findings = repository.list_finding_groups(
+            scan_id, risk=risk, review=review, q=q, sort=sort,
+        )
+        return templates.TemplateResponse(
+            request, "partials/findings_table.html",
+            context(request, findings=findings),
         )
 
     @app.get("/scans/{scan_id}/status", response_class=HTMLResponse)
@@ -268,18 +293,29 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         if not finding:
             raise HTTPException(404)
         return templates.TemplateResponse(
-            request, "finding_detail.html", context(request, finding=finding)
+            request, "finding_detail.html",
+            context(request, finding=finding, related=repository.related_findings(finding_id)),
         )
 
     @app.post("/findings/{finding_id}/review")
     def update_review(
-        finding_id: int, review_status: str = Form(...), review_note: str = Form(""),
+        request: Request, finding_id: int, review_status: str = Form(...), review_note: str = Form(""),
         csrf_token_value: str = Form(..., alias="csrf_token"),
     ):
         check_csrf(csrf_token_value)
         if review_status not in REVIEW_STATUSES:
             raise HTTPException(400, "סטטוס לא תקין")
         repository.update_review(finding_id, review_status, review_note)
+        if request.headers.get("HX-Request") == "true":
+            finding = repository.get_finding(finding_id)
+            response = templates.TemplateResponse(
+                request, "partials/review_form.html", context(request, finding=finding),
+            )
+            response.headers["HX-Trigger"] = json.dumps(
+                {"showToast": {"message": "הסקירה נשמרה", "tone": "success"}},
+                ensure_ascii=False,
+            )
+            return response
         return RedirectResponse(f"/findings/{finding_id}", status_code=303)
 
     @app.get("/findings/{finding_id}/screenshot")
@@ -293,18 +329,39 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         return FileResponse(path, media_type="image/png")
 
     @app.get("/mappings", response_class=HTMLResponse)
-    def mappings(request: Request):
+    def mappings(request: Request, q: str = "", status: str = ""):
         return templates.TemplateResponse(
-            request, "mappings.html", context(request, mappings=repository.list_mappings())
+            request, "mappings.html",
+            context(
+                request, mappings=repository.list_mappings(q=q, status=status),
+                mapping_stats=repository.mapping_stats(), q_filter=q, status_filter=status,
+            ),
+        )
+
+    @app.get("/mappings/list", response_class=HTMLResponse)
+    def mappings_list(request: Request, q: str = "", status: str = ""):
+        return templates.TemplateResponse(
+            request, "partials/mappings_list.html",
+            context(request, mappings=repository.list_mappings(q=q, status=status)),
         )
 
     @app.post("/mappings/{brand_id}/confirm")
     def confirm_mapping(
-        brand_id: int, ticker: str = Form(...), company_name: str = Form(...),
+        request: Request, brand_id: int, ticker: str = Form(...), company_name: str = Form(...),
         csrf_token_value: str = Form(..., alias="csrf_token"),
     ):
         check_csrf(csrf_token_value)
         FinanceService().confirm_candidate(repository, brand_id, ticker, company_name)
+        if request.headers.get("HX-Request") == "true":
+            return Response(
+                headers={
+                    "HX-Refresh": "true",
+                    "HX-Trigger": json.dumps(
+                        {"showToast": {"message": "מיפוי החברה עודכן", "tone": "success"}},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
         return RedirectResponse("/mappings", status_code=303)
 
     @app.get("/scans/{scan_id}/export/{file_type}")

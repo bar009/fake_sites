@@ -9,6 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
+from fakeshop.brand_identity import brand_key, canonical_brand_name
+from fakeshop.whois_check import domain_of, registrable_domain
+
+
+SCHEMA_VERSION = 2
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -67,7 +73,10 @@ CREATE TABLE IF NOT EXISTS findings (
     final_url TEXT NOT NULL DEFAULT '',
     page_title TEXT NOT NULL DEFAULT '',
     search_snippet TEXT NOT NULL DEFAULT '',
+    search_query TEXT NOT NULL DEFAULT '',
+    search_title TEXT NOT NULL DEFAULT '',
     domain TEXT NOT NULL DEFAULT '',
+    registrable_domain TEXT NOT NULL DEFAULT '',
     http_status INTEGER,
     domain_created TEXT NOT NULL DEFAULT '',
     domain_age_days INTEGER,
@@ -75,6 +84,7 @@ CREATE TABLE IF NOT EXISTS findings (
     country TEXT NOT NULL DEFAULT '',
     screenshot_path TEXT NOT NULL DEFAULT '',
     error TEXT NOT NULL DEFAULT '',
+    capture_note TEXT NOT NULL DEFAULT '',
     risk_score INTEGER NOT NULL DEFAULT 0,
     risk_level TEXT NOT NULL DEFAULT 'low',
     priority_score INTEGER NOT NULL DEFAULT 0,
@@ -92,7 +102,137 @@ class Repository:
     def __init__(self, db_path: Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        existed = self.db_path.exists()
+        if existed and self._schema_version() < SCHEMA_VERSION:
+            self._backup_database()
         self.init_schema()
+        self._migrate()
+
+    def _schema_version(self) -> int:
+        if not self.db_path.exists():
+            return 0
+        with sqlite3.connect(self.db_path) as connection:
+            return int(connection.execute("PRAGMA user_version").fetchone()[0])
+
+    def _backup_database(self) -> None:
+        backup_dir = self.db_path.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        backup_path = backup_dir / f"{self.db_path.stem}-v{self._schema_version()}-{stamp}.db"
+        with sqlite3.connect(self.db_path) as source, sqlite3.connect(backup_path) as target:
+            source.backup(target)
+
+    def _migrate(self) -> None:
+        with self.connect() as connection:
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(findings)").fetchall()
+            }
+            additions = {
+                "search_query": "TEXT NOT NULL DEFAULT ''",
+                "search_title": "TEXT NOT NULL DEFAULT ''",
+                "registrable_domain": "TEXT NOT NULL DEFAULT ''",
+                "capture_note": "TEXT NOT NULL DEFAULT ''",
+            }
+            for name, declaration in additions.items():
+                if name not in columns:
+                    connection.execute(f"ALTER TABLE findings ADD COLUMN {name} {declaration}")
+
+            rows = connection.execute(
+                "SELECT id, domain FROM findings WHERE registrable_domain=''"
+            ).fetchall()
+            for row in rows:
+                connection.execute(
+                    "UPDATE findings SET registrable_domain=? WHERE id=?",
+                    (registrable_domain(row["domain"]), row["id"]),
+                )
+
+            self._merge_duplicate_brands(connection)
+            connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+    @staticmethod
+    def _merge_duplicate_brands(connection: sqlite3.Connection) -> None:
+        rows = [dict(row) for row in connection.execute("SELECT * FROM brands ORDER BY id")]
+        groups: dict[str, list[dict]] = {}
+        for row in rows:
+            groups.setdefault(brand_key(row["name"]), []).append(row)
+
+        status_rank = {
+            "confirmed": 6, "auto_confirmed": 5, "needs_review": 4,
+            "no_match": 3, "unavailable": 2, "pending": 1,
+        }
+        for key, group in groups.items():
+            if not key:
+                continue
+            survivor = group[0]
+            ids = [item["id"] for item in group]
+            placeholders = ",".join("?" for _ in ids)
+            mappings = [dict(row) for row in connection.execute(
+                f"SELECT * FROM company_mappings WHERE brand_id IN ({placeholders})", ids,
+            )]
+            chosen_mapping = max(
+                mappings,
+                key=lambda item: (
+                    status_rank.get(item.get("status", "pending"), 0),
+                    item.get("finance_fetched_at", ""),
+                ),
+                default=None,
+            )
+            candidates = {}
+            for mapping in mappings:
+                for candidate in json.loads(mapping.get("candidates_json") or "[]"):
+                    candidate_key = candidate.get("ticker") or candidate.get("name")
+                    if candidate_key:
+                        candidates[candidate_key] = candidate
+
+            for duplicate in group[1:]:
+                connection.execute(
+                    "UPDATE scan_targets SET brand_id=? WHERE brand_id=?",
+                    (survivor["id"], duplicate["id"]),
+                )
+                connection.execute(
+                    "UPDATE findings SET brand_id=? WHERE brand_id=?",
+                    (survivor["id"], duplicate["id"]),
+                )
+            connection.execute(
+                f"DELETE FROM company_mappings WHERE brand_id IN ({placeholders})", ids,
+            )
+            if len(group) > 1:
+                connection.execute(
+                    f"DELETE FROM brands WHERE id IN ({','.join('?' for _ in group[1:])})",
+                    [item["id"] for item in group[1:]],
+                )
+
+            def first_value(field: str) -> str:
+                return next((item[field] for item in group if item.get(field)), "")
+
+            connection.execute(
+                """UPDATE brands SET name=?, normalized_name=?, topic=?,
+                          parent_company_override=?, ticker_override=?, official_domain=?
+                   WHERE id=?""",
+                (
+                    canonical_brand_name(survivor["name"]), key, first_value("topic"),
+                    first_value("parent_company_override"), first_value("ticker_override"),
+                    first_value("official_domain"), survivor["id"],
+                ),
+            )
+            if chosen_mapping:
+                chosen_mapping["candidates_json"] = json.dumps(
+                    list(candidates.values()), ensure_ascii=False,
+                )
+                connection.execute(
+                    """INSERT INTO company_mappings(
+                           brand_id, parent_company, ticker, status, candidates_json,
+                           market_cap_usd, finance_source, finance_fetched_at, last_error)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        survivor["id"], chosen_mapping.get("parent_company", ""),
+                        chosen_mapping.get("ticker", ""), chosen_mapping.get("status", "pending"),
+                        chosen_mapping["candidates_json"], chosen_mapping.get("market_cap_usd"),
+                        chosen_mapping.get("finance_source", ""),
+                        chosen_mapping.get("finance_fetched_at", ""),
+                        chosen_mapping.get("last_error", ""),
+                    ),
+                )
 
     @contextmanager
     def connect(self):
@@ -112,10 +252,10 @@ class Repository:
 
     @staticmethod
     def _normalise_brand(name: str) -> str:
-        return " ".join(name.lower().split())
+        return brand_key(name)
 
     def upsert_brand(self, item: dict) -> int:
-        name = item["brand"].strip()
+        name = canonical_brand_name(item["brand"])
         normalized = self._normalise_brand(name)
         with self.connect() as connection:
             connection.execute(
@@ -188,8 +328,10 @@ class Repository:
         with self.connect() as connection:
             rows = connection.execute(
                 """SELECT s.*,
-                          (SELECT COUNT(*) FROM findings f WHERE f.scan_id=s.id) AS finding_count,
-                          (SELECT COUNT(*) FROM findings f WHERE f.scan_id=s.id AND f.risk_level='high') AS high_count
+                          (SELECT COUNT(DISTINCT COALESCE(NULLIF(f.registrable_domain,''), f.domain))
+                           FROM findings f WHERE f.scan_id=s.id) AS finding_count,
+                          (SELECT COUNT(DISTINCT COALESCE(NULLIF(f.registrable_domain,''), f.domain))
+                           FROM findings f WHERE f.scan_id=s.id AND f.risk_level='high') AS high_count
                    FROM scan_runs s ORDER BY s.id DESC LIMIT ?""", (limit,),
             ).fetchall()
             return [dict(row) for row in rows]
@@ -203,6 +345,27 @@ class Repository:
                    WHERE t.scan_id=? AND t.status='pending' ORDER BY t.id""", (scan_id,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def list_scan_targets(self, scan_id: int) -> list[dict]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT t.*, b.name AS brand, b.topic,
+                          COUNT(f.id) AS page_count,
+                          COUNT(DISTINCT COALESCE(NULLIF(f.registrable_domain,''), f.domain)) AS domain_count
+                   FROM scan_targets t JOIN brands b ON b.id=t.brand_id
+                   LEFT JOIN findings f ON f.scan_id=t.scan_id AND f.brand_id=t.brand_id
+                   WHERE t.scan_id=?
+                   GROUP BY t.id ORDER BY t.id""", (scan_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["display_status"] = (
+                    "no_results" if item["status"] == "completed" and not item["domain_count"]
+                    else item["status"]
+                )
+                result.append(item)
+            return result
 
     def set_target_status(self, target_id: int, status: str, error: str = "") -> None:
         with self.connect() as connection:
@@ -250,25 +413,29 @@ class Repository:
                     assessment: dict, priority: int) -> int:
         values = (
             scan_id, brand_id, row.get("rank"), row.get("url", ""), row.get("final_url", ""),
-            row.get("page_title", ""), row.get("search_snippet", ""), row.get("domain", ""),
-            row.get("http_status"), row.get("domain_created", ""), row.get("domain_age_days"),
+            row.get("page_title", ""), row.get("search_snippet", ""), row.get("query", ""),
+            row.get("search_title", ""), row.get("domain", ""),
+            row.get("registrable_domain", ""), row.get("http_status"),
+            row.get("domain_created", ""), row.get("domain_age_days"),
             row.get("registrar", ""), row.get("country", ""), row.get("screenshot_path", ""),
-            row.get("error", ""), assessment["score"], assessment["level"], priority,
+            row.get("error", ""), row.get("note", ""), assessment["score"], assessment["level"], priority,
             json.dumps(assessment["evidence"], ensure_ascii=False), utc_now(),
         )
         with self.connect() as connection:
             cursor = connection.execute(
                 """INSERT INTO findings(
                        scan_id, brand_id, rank, url, final_url, page_title, search_snippet,
-                       domain, http_status, domain_created, domain_age_days, registrar,
-                       country, screenshot_path, error, risk_score, risk_level,
-                       priority_score, evidence_json, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       search_query, search_title, domain, registrable_domain, http_status,
+                       domain_created, domain_age_days, registrar, country, screenshot_path,
+                       error, capture_note, risk_score, risk_level, priority_score,
+                       evidence_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 values,
             )
             return int(cursor.lastrowid)
 
-    def list_findings(self, scan_id: int, risk: str = "", review: str = "") -> list[dict]:
+    def list_findings(self, scan_id: int, risk: str = "", review: str = "",
+                      q: str = "", sort: str = "priority") -> list[dict]:
         clauses = ["f.scan_id=?"]
         params: list = [scan_id]
         if risk:
@@ -277,31 +444,92 @@ class Repository:
         if review:
             clauses.append("f.review_status=?")
             params.append(review)
+        if q:
+            clauses.append("(f.domain LIKE ? OR b.name LIKE ? OR f.page_title LIKE ?)")
+            needle = f"%{q.strip()}%"
+            params.extend([needle, needle, needle])
+        orderings = {
+            "priority": "f.priority_score DESC, f.risk_score DESC, f.id",
+            "risk": "f.risk_score DESC, f.priority_score DESC, f.id",
+            "date": "f.created_at DESC, f.id DESC",
+            "domain": "f.domain COLLATE NOCASE, f.id",
+        }
+        ordering = orderings.get(sort, orderings["priority"])
         with self.connect() as connection:
             rows = connection.execute(
                 f"""SELECT f.*, b.name AS brand, b.topic, m.parent_company,
-                            m.ticker, m.market_cap_usd, m.finance_fetched_at
+                            b.official_domain, m.ticker, m.market_cap_usd,
+                            m.status AS mapping_status, m.finance_source,
+                            m.finance_fetched_at, m.last_error AS finance_error
                      FROM findings f JOIN brands b ON b.id=f.brand_id
                      LEFT JOIN company_mappings m ON m.brand_id=b.id
                      WHERE {' AND '.join(clauses)}
-                     ORDER BY f.priority_score DESC, f.id""", params,
+                     ORDER BY {ordering}""", params,
             ).fetchall()
             return [self._decode_finding(dict(row)) for row in rows]
+
+    def list_finding_groups(self, scan_id: int, risk: str = "", review: str = "",
+                            q: str = "", sort: str = "priority") -> list[dict]:
+        rows = self.list_findings(scan_id, risk=risk, review=review, q=q, sort=sort)
+        grouped: dict[tuple, list[dict]] = {}
+        for row in rows:
+            key = (row["brand_id"], row.get("registrable_domain") or row["domain"])
+            grouped.setdefault(key, []).append(row)
+        result = []
+        for members in grouped.values():
+            representative = max(
+                members,
+                key=lambda item: (item["priority_score"], item["risk_score"], -(item.get("rank") or 9999)),
+            ).copy()
+            representative["page_count"] = len(members)
+            representative["related_finding_ids"] = [item["id"] for item in members]
+            result.append(representative)
+        sorters = {
+            "priority": lambda item: (-item["priority_score"], -item["risk_score"], item["id"]),
+            "risk": lambda item: (-item["risk_score"], -item["priority_score"], item["id"]),
+            "date": lambda item: (item["created_at"], item["id"]),
+            "domain": lambda item: ((item.get("registrable_domain") or item["domain"]).casefold(), item["id"]),
+        }
+        result.sort(key=sorters.get(sort, sorters["priority"]), reverse=sort == "date")
+        return result
 
     def get_finding(self, finding_id: int):
         with self.connect() as connection:
             row = connection.execute(
                 """SELECT f.*, b.name AS brand, b.topic, m.parent_company,
-                          m.ticker, m.market_cap_usd, m.finance_fetched_at
+                          b.official_domain, m.ticker, m.market_cap_usd,
+                          m.status AS mapping_status, m.finance_source,
+                          m.finance_fetched_at, m.last_error AS finance_error
                    FROM findings f JOIN brands b ON b.id=f.brand_id
                    LEFT JOIN company_mappings m ON m.brand_id=b.id
                    WHERE f.id=?""", (finding_id,),
             ).fetchone()
             return self._decode_finding(dict(row)) if row else None
 
+    def related_findings(self, finding_id: int) -> list[dict]:
+        finding = self.get_finding(finding_id)
+        if not finding:
+            return []
+        domain = finding.get("registrable_domain") or finding["domain"]
+        return [
+            row for row in self.list_findings(finding["scan_id"])
+            if row["id"] != finding_id
+            and row["brand_id"] == finding["brand_id"]
+            and (row.get("registrable_domain") or row["domain"]) == domain
+        ]
+
     @staticmethod
     def _decode_finding(row: dict) -> dict:
         row["evidence"] = json.loads(row.pop("evidence_json") or "[]")
+        official = (row.get("official_domain") or "").strip().lower()
+        if official:
+            official_host = domain_of(official if "://" in official else f"https://{official}")
+            row["official_domain_match"] = (
+                registrable_domain(official_host)
+                == (row.get("registrable_domain") or registrable_domain(row.get("domain", "")))
+            )
+        else:
+            row["official_domain_match"] = None
         return row
 
     def update_review(self, finding_id: int, status: str, note: str) -> None:
@@ -310,6 +538,19 @@ class Repository:
                 "UPDATE findings SET review_status=?, review_note=? WHERE id=?",
                 (status, note.strip()[:2000], finding_id),
             )
+
+    def refresh_brand_priorities(self, brand_id: int, market_cap_usd) -> None:
+        from fakeshop.scoring import priority_score
+
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT id, risk_score FROM findings WHERE brand_id=?", (brand_id,),
+            ).fetchall()
+            for row in rows:
+                connection.execute(
+                    "UPDATE findings SET priority_score=? WHERE id=?",
+                    (priority_score(row["risk_score"], market_cap_usd), row["id"]),
+                )
 
     def delete_scan(self, scan_id: int) -> list[str]:
         with self.connect() as connection:
@@ -350,13 +591,25 @@ class Repository:
                  defaults["candidates_json"], defaults["market_cap_usd"],
                  defaults["finance_source"], defaults["finance_fetched_at"], defaults["last_error"]),
             )
+        self.refresh_brand_priorities(brand_id, defaults["market_cap_usd"])
 
-    def list_mappings(self) -> list[dict]:
+    def list_mappings(self, q: str = "", status: str = "") -> list[dict]:
+        clauses = ["1=1"]
+        params = []
+        if q:
+            clauses.append("(b.name LIKE ? OR m.parent_company LIKE ? OR m.ticker LIKE ?)")
+            needle = f"%{q.strip()}%"
+            params.extend([needle, needle, needle])
+        if status:
+            clauses.append("COALESCE(m.status, 'pending')=?")
+            params.append(status)
         with self.connect() as connection:
             rows = connection.execute(
-                """SELECT b.id AS brand_id, b.name AS brand, b.topic, m.*
+                f"""SELECT b.id AS brand_id, b.name AS brand, b.topic, b.official_domain, m.*
                    FROM brands b LEFT JOIN company_mappings m ON m.brand_id=b.id
+                   WHERE {' AND '.join(clauses)}
                    ORDER BY CASE WHEN m.status='needs_review' THEN 0 ELSE 1 END, b.name"""
+                , params,
             ).fetchall()
             result = []
             for row in rows:
@@ -365,6 +618,17 @@ class Repository:
                 result.append(item)
             return result
 
+    def mapping_stats(self) -> dict:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT COUNT(*) AS total,
+                          SUM(CASE WHEN status IN ('confirmed','auto_confirmed') THEN 1 ELSE 0 END) AS confirmed,
+                          SUM(CASE WHEN status='needs_review' THEN 1 ELSE 0 END) AS needs_review,
+                          SUM(CASE WHEN status='no_match' THEN 1 ELSE 0 END) AS no_match
+                   FROM company_mappings"""
+            ).fetchone()
+            return {key: (row[key] or 0) for key in row.keys()}
+
     def latest_finance_update(self) -> str:
         with self.connect() as connection:
             row = connection.execute(
@@ -372,13 +636,43 @@ class Repository:
             ).fetchone()
             return row["updated"] or "טרם עודכן"
 
+    def finance_status(self) -> dict:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT MAX(finance_fetched_at) AS attempted,
+                          MAX(CASE WHEN market_cap_usd IS NOT NULL THEN finance_fetched_at ELSE '' END) AS successful
+                   FROM company_mappings"""
+            ).fetchone()
+            return {
+                "attempted": row["attempted"] or "טרם עודכן",
+                "successful": row["successful"] or "",
+            }
+
+    def active_scans(self, limit: int = 5) -> list[dict]:
+        return [scan for scan in self.list_scans(limit=50) if scan["status"] in {"queued", "running"}][:limit]
+
+    def urgent_findings(self, limit: int = 5) -> list[dict]:
+        with self.connect() as connection:
+            scan_ids = [row["scan_id"] for row in connection.execute(
+                """SELECT DISTINCT scan_id FROM findings
+                   WHERE review_status!='false_positive'
+                   ORDER BY scan_id DESC LIMIT 20"""
+            ).fetchall()]
+        rows = []
+        for scan_id in scan_ids:
+            rows.extend(self.list_finding_groups(scan_id, sort="priority"))
+        rows = [row for row in rows if row["review_status"] != "false_positive"]
+        rows.sort(key=lambda item: (-item["priority_score"], -item["risk_score"], -item["id"]))
+        return rows[:limit]
+
     def dashboard_stats(self) -> dict:
         with self.connect() as connection:
             row = connection.execute(
                 """SELECT
                     (SELECT COUNT(*) FROM scan_runs) AS scans,
-                    (SELECT COUNT(*) FROM findings) AS findings,
-                    (SELECT COUNT(*) FROM findings WHERE risk_level='high') AS high,
+                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings) AS findings,
+                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings WHERE risk_level='high') AS high,
+                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings WHERE review_status IN ('unreviewed','investigate')) AS pending_review,
                     (SELECT COUNT(*) FROM findings WHERE review_status='confirmed') AS confirmed"""
             ).fetchone()
             return dict(row)
