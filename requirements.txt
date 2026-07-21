@@ -2,7 +2,7 @@
 # tries to compile the C brotli package. Install like this instead:
 #   pip install ddgs --no-deps
 #   pip install "click>=8.1.8" "primp>=1.2.3" "lxml>=4.9.4" "httpx[http2,socks]>=0.28.1" "fake-useragent>=2.2.0"
-#   pip install playwright openpyxl requests python-dotenv
+#   pip install playwright openpyxl requests python-dotenv fastapi uvicorn jinja2 python-multipart yfinance
 # On x64 machines a plain 'pip install -r requirements.txt' works.
 ddgs>=9.0.0
 playwright>=1.45.0
