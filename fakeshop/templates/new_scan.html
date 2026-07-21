@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}סריקה חדשה — Fake Shop Checker{% endblock %}
+{% block content %}
+<section class="page-intro"><span class="eyebrow">New investigation</span><h1>סריקה חדשה</h1><p>בחרו נקודת התחלה. כל עבודה תיכנס לתור ותמשיך גם אם הדף יתרענן.</p></section>
+<div class="form-grid">
+  <section class="form-card featured-card">
+    <div class="card-number">01</div><h2>רשימת מותגים</h2><p>העלאת CSV לסריקת אצווה. עמודת <code>brand</code> היא חובה.</p>
+    <form method="post" action="/scans/csv" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="upload-box"><span>בחרו קובץ CSV</span><small>UTF-8 · עד 1MB · עד 2,000 מותגים</small><input required type="file" name="file" accept=".csv,text/csv"></label>
+      <div class="two-fields"><label>ספק חיפוש<select name="provider"><option value="ddgs">DuckDuckGo — ללא מפתח</option><option value="brave">Brave — דורש .env</option></select></label><label>תוצאות למותג<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
+      <button class="button button-primary" type="submit">העלאה והתחלה</button>
+    </form>
+  </section>
+  <section class="form-card">
+    <div class="card-number">02</div><h2>מותג יחיד</h2><p>חיפוש מיידי של תוצאות <span dir="ltr">.shop</span> עבור מותג אחד.</p>
+    <form method="post" action="/scans/brand">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>שם המותג<input required name="brand" maxlength="200" placeholder="לדוגמה: Nike"></label>
+      <label>נושא, אופציונלי<input name="topic" maxlength="200" placeholder="sportswear"></label>
+      <div class="two-fields"><label>ספק<select name="provider"><option value="ddgs">DuckDuckGo</option><option value="brave">Brave</option></select></label><label>תוצאות<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
+      <button class="button button-secondary" type="submit">חיפוש מותג</button>
+    </form>
+  </section>
+  <section class="form-card">
+    <div class="card-number">03</div><h2>כתובת חשודה</h2><p>בדיקה ישירה. הכתובת תיטען בדפדפן מבודד ללא לחיצות או הורדות.</p>
+    <form method="post" action="/scans/url">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>שם המותג<input required name="brand" maxlength="200" placeholder="המותג שמתחזים אליו"></label>
+      <label>כתובת URL<input required type="url" name="url" placeholder="https://example.shop/"></label>
+      <label>נושא, אופציונלי<input name="topic" maxlength="200"></label>
+      <button class="button button-secondary" type="submit">בדיקת הכתובת</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

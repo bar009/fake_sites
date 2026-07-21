@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Fake Shop Checker{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a href="/" class="brand-mark" aria-label="Fake Shop Checker — דף הבית">
+      <span class="brand-symbol">FS</span>
+      <span><strong>Fake Shop Checker</strong><small>מרכז חקירת התחזויות</small></span>
+    </a>
+    <nav aria-label="ניווט ראשי">
+      <a href="/">סקירות</a>
+      <a href="/mappings">מיפוי חברות</a>
+      <a href="/scans/new" class="button button-primary">סריקה חדשה</a>
+    </nav>
+  </header>
+  <aside class="finance-banner" role="note">
+    <span class="status-dot"></span>
+    <strong>שקיפות נתונים:</strong> מקור נתוני השווי הוא Yahoo Finance דרך yfinance (לא רשמי).
+    הנתונים אינדיקטיביים בלבד. עדכון אחרון: <span dir="ltr">{{ finance_updated }}</span>
+  </aside>
+  <main class="page-shell">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

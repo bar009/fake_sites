@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}לוח בקרה — Fake Shop Checker{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <span class="eyebrow">Threat intelligence · סביבת מחקר מקומית</span>
+    <h1>מוצאים התחזויות<br><span>לפני שהן מוצאות לקוחות.</span></h1>
+    <p>סריקה ממוקדת של אתרי <span dir="ltr">.shop</span>, דירוג ראייתי וצילומי מסך בטוחים — במקום לפתוח קישורים עוינים.</p>
+    <a class="button button-primary button-large" href="/scans/new">התחלת סריקה</a>
+  </div>
+  <div class="signal-panel" aria-label="עקרונות המערכת">
+    <div><b>01</b><span>גילוי</span><small>חיפוש לפי חתימת תבנית</small></div>
+    <div><b>02</b><span>אימות</span><small>דומיין, תוכן והפניות</small></div>
+    <div><b>03</b><span>תעדוף</span><small>סיכון והשפעה עסקית</small></div>
+  </div>
+</section>
+
+<section class="stat-grid" aria-label="נתוני מערכת">
+  <article><span>סריקות</span><strong>{{ stats.scans }}</strong><small>כל ההיסטוריה</small></article>
+  <article><span>ממצאים</span><strong>{{ stats.findings }}</strong><small>אתרים שנבדקו</small></article>
+  <article class="danger-stat"><span>סיכון גבוה</span><strong>{{ stats.high }}</strong><small>דורשים תשומת לב</small></article>
+  <article><span>אומתו</span><strong>{{ stats.confirmed }}</strong><small>בסקירה אנושית</small></article>
+</section>
+
+<section class="section-heading">
+  <div><span class="eyebrow">Activity</span><h2>סריקות אחרונות</h2></div>
+  <a href="/scans/new" class="text-link">סריקה חדשה ←</a>
+</section>
+
+{% if scans %}
+<div class="scan-list">
+  {% for scan in scans %}
+  <a href="/scans/{{ scan.id }}" class="scan-row">
+    <span class="scan-id">#{{ scan.id }}</span>
+    <span class="scan-main"><strong>{{ scan.source_name or scan.kind }}</strong><small>{{ scan.created_at }}</small></span>
+    <span class="pill status-{{ scan.status }}">{{ {'queued':'בתור','running':'פעילה','completed':'הושלמה','cancelled':'נעצרה','failed':'נכשלה','interrupted':'הופסקה'}[scan.status] }}</span>
+    <span class="scan-metric"><b>{{ scan.finding_count }}</b><small>ממצאים</small></span>
+    <span class="scan-metric danger-text"><b>{{ scan.high_count }}</b><small>גבוהים</small></span>
+    <span class="arrow">←</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><strong>אין עדיין סריקות</strong><p>התחילו עם CSV, מותג או כתובת אתר אחת.</p><a class="button button-primary" href="/scans/new">לסריקה הראשונה</a></div>
+{% endif %}
+{% endblock %}
