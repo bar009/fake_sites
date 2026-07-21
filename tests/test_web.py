@@ -62,19 +62,36 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         targets=[{"brand": "Example", "official_domain": "example.com"}],
     )
     target = repository.pending_targets(scan_id)[0]
+    screenshot = tmp_path / "scans" / str(scan_id) / "example.png"
+    screenshot.parent.mkdir(parents=True)
+    screenshot.write_bytes(b"not-a-real-png")
     finding_id = repository.add_finding(
         scan_id=scan_id, brand_id=target["brand_id"],
         row={"url": "https://example-sale.shop/path", "domain": "example-sale.shop",
              "registrable_domain": "example-sale.shop", "query": "site:.shop query",
              "search_title": "Search title", "search_snippet": "Search snippet",
-             "page_title": "Page title", "final_url": "https://redirect.shop/"},
-        assessment={"score": 80, "level": "high", "evidence": []}, priority=80,
+             "page_title": "Page title", "final_url": "https://redirect.shop/",
+             "screenshot_path": str(screenshot)},
+        assessment={"score": 80, "level": "high", "evidence": [
+            {"code": "template_phrase", "label": "Storefront template fingerprint",
+             "detail": "Phrase found", "points": 40},
+        ]}, priority=80,
     )
     with TestClient(app) as client:
         dashboard = client.get("/")
         assert "/static/vendor/htmx.min.js" in dashboard.text
         assert "unpkg.com" not in dashboard.text
         assert "https://unpkg.com" not in dashboard.headers["content-security-policy"]
+        assert "High-risk companies" in dashboard.text
+        assert "Awaiting review (companies)" in dashboard.text
+        investigations = client.get("/findings")
+        assert investigations.status_code == 200
+        assert "Open any row to review the website" in investigations.text
+        assert f'href="/findings/{finding_id}"' in investigations.text
+        assert "https://example-sale.shop/path" in investigations.text
+        assert f'src="/findings/{finding_id}/screenshot"' in investigations.text
+        global_partial = client.get("/findings/list?risk=low", headers={"HX-Request": "true"})
+        assert "No matching findings" in global_partial.text
         filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
         assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
         partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})
@@ -83,7 +100,12 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert "site:.shop query" in detail.text
         assert "Search snippet" in detail.text
         assert "example.com" in detail.text
+        assert "Detected indicators" in detail.text
+        assert "Copy case summary" in detail.text
+        assert "Potential brand impersonation case" in detail.text
         assert '<a href="https://example-sale.shop' not in detail.text
+        mappings = client.get("/mappings")
+        assert "This is not the suspicious website list" in mappings.text
         exported = client.get(f"/scans/{scan_id}/export/html")
         assert "<html lang='en' dir='ltr'>" in exported.text
         assert "Scan #" in exported.text

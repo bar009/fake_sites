@@ -547,7 +547,9 @@ class Repository:
         if risk:
             clauses.append("f.risk_level=?")
             params.append(risk)
-        if review:
+        if review == "open":
+            clauses.append("f.review_status IN ('unreviewed','investigate')")
+        elif review:
             clauses.append("f.review_status=?")
             params.append(review)
         if q:
@@ -577,6 +579,54 @@ class Repository:
     def list_finding_groups(self, scan_id: int, risk: str = "", review: str = "",
                             q: str = "", sort: str = "priority") -> list[dict]:
         rows = self.list_findings(scan_id, risk=risk, review=review, q=q, sort=sort)
+        return self._group_finding_rows(rows, sort)
+
+    def list_all_findings(self, risk: str = "", review: str = "", q: str = "",
+                          sort: str = "priority") -> list[dict]:
+        clauses = ["1=1"]
+        params: list = []
+        if risk:
+            clauses.append("f.risk_level=?")
+            params.append(risk)
+        if review == "open":
+            clauses.append("f.review_status IN ('unreviewed','investigate')")
+        elif review:
+            clauses.append("f.review_status=?")
+            params.append(review)
+        if q:
+            clauses.append(
+                "(f.domain LIKE ? OR f.url LIKE ? OR b.name LIKE ? "
+                "OR f.page_title LIKE ? OR m.parent_company LIKE ?)"
+            )
+            needle = f"%{q.strip()}%"
+            params.extend([needle, needle, needle, needle, needle])
+        orderings = {
+            "priority": "f.priority_score DESC, f.risk_score DESC, f.id DESC",
+            "risk": "f.risk_score DESC, f.priority_score DESC, f.id DESC",
+            "date": "f.created_at DESC, f.id DESC",
+            "domain": "f.domain COLLATE NOCASE, f.id DESC",
+        }
+        ordering = orderings.get(sort, orderings["priority"])
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"""SELECT f.*, b.name AS brand, b.topic, m.parent_company,
+                            b.official_domain, m.ticker, m.market_cap_usd,
+                            m.status AS mapping_status, m.finance_source,
+                            m.finance_fetched_at, m.last_error AS finance_error
+                     FROM findings f JOIN brands b ON b.id=f.brand_id
+                     LEFT JOIN company_mappings m ON m.brand_id=b.id
+                     WHERE {' AND '.join(clauses)}
+                     ORDER BY {ordering}""", params,
+            ).fetchall()
+            return [self._decode_finding(dict(row)) for row in rows]
+
+    def list_all_finding_groups(self, risk: str = "", review: str = "", q: str = "",
+                                sort: str = "priority") -> list[dict]:
+        rows = self.list_all_findings(risk=risk, review=review, q=q, sort=sort)
+        return self._group_finding_rows(rows, sort)
+
+    @staticmethod
+    def _group_finding_rows(rows: list[dict], sort: str) -> list[dict]:
         grouped: dict[tuple, list[dict]] = {}
         for row in rows:
             key = (row["brand_id"], row.get("registrable_domain") or row["domain"])
@@ -588,6 +638,7 @@ class Repository:
                 key=lambda item: (item["priority_score"], item["risk_score"], -(item.get("rank") or 9999)),
             ).copy()
             representative["page_count"] = len(members)
+            representative["scan_count"] = len({item["scan_id"] for item in members})
             representative["related_finding_ids"] = [item["id"] for item in members]
             result.append(representative)
         sorters = {
@@ -618,7 +669,7 @@ class Repository:
             return []
         domain = finding.get("registrable_domain") or finding["domain"]
         return [
-            row for row in self.list_findings(finding["scan_id"])
+            row for row in self.list_all_findings()
             if row["id"] != finding_id
             and row["brand_id"] == finding["brand_id"]
             and (row.get("registrable_domain") or row["domain"]) == domain
@@ -758,15 +809,7 @@ class Repository:
         return [scan for scan in self.list_scans(limit=50) if scan["status"] in {"queued", "running"}][:limit]
 
     def urgent_findings(self, limit: int = 5) -> list[dict]:
-        with self.connect() as connection:
-            scan_ids = [row["scan_id"] for row in connection.execute(
-                """SELECT DISTINCT scan_id FROM findings
-                   WHERE review_status!='false_positive'
-                   ORDER BY scan_id DESC LIMIT 20"""
-            ).fetchall()]
-        rows = []
-        for scan_id in scan_ids:
-            rows.extend(self.list_finding_groups(scan_id, sort="priority"))
+        rows = self.list_all_finding_groups(sort="priority")
         rows = [row for row in rows if row["review_status"] != "false_positive"]
         rows.sort(key=lambda item: (-item["priority_score"], -item["risk_score"], -item["id"]))
         return rows[:limit]
@@ -777,8 +820,8 @@ class Repository:
                 """SELECT
                     (SELECT COUNT(*) FROM scan_runs) AS scans,
                     (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings) AS findings,
-                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings WHERE risk_level='high') AS high,
-                    (SELECT COUNT(DISTINCT COALESCE(NULLIF(registrable_domain,''), domain)) FROM findings WHERE review_status IN ('unreviewed','investigate')) AS pending_review,
+                    (SELECT COUNT(DISTINCT brand_id) FROM findings WHERE risk_level='high') AS high_companies,
+                    (SELECT COUNT(DISTINCT brand_id) FROM findings WHERE review_status IN ('unreviewed','investigate')) AS pending_review_companies,
                     (SELECT COUNT(*) FROM findings WHERE review_status='confirmed') AS confirmed"""
             ).fetchone()
             return dict(row)
