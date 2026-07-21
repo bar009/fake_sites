@@ -8,10 +8,10 @@
 </header>
 
 <section class="kpi-grid" aria-label="System metrics">
-  {{ kpi('Unique domains', stats.findings, 'Grouped by registered domain', 'shield', 'blue') }}
-  {{ kpi('High risk', stats.high, 'Require attention', 'alert', 'red') }}
-  {{ kpi('Awaiting review', stats.pending_review, 'Not yet reviewed by an analyst', 'activity', 'amber') }}
-  {{ kpi('Scans', stats.scans, 'Across all history', 'scan', 'cyan') }}
+  <a class="kpi-link" href="/findings">{{ kpi('Unique domains', stats.findings, 'Across all investigation history', 'shield', 'blue') }}</a>
+  <a class="kpi-link" href="/findings?risk=high">{{ kpi('High-risk companies', stats.high_companies, 'Distinct affected brands', 'alert', 'red') }}</a>
+  <a class="kpi-link" href="/findings?review=open">{{ kpi('Awaiting review (companies)', stats.pending_review_companies, 'Distinct brands with open cases', 'activity', 'amber') }}</a>
+  <a class="kpi-link" href="#scan-history">{{ kpi('Scan history', stats.scans, 'All completed and active runs', 'scan', 'cyan') }}</a>
 </section>
 
 {% if active_scans %}
@@ -32,7 +32,7 @@
 
 <div class="dashboard-grid">
   <section class="dashboard-section urgent-section">
-    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Urgent findings</h2></div><small>Excludes false positives</small></div>
+    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Priority investigations</h2></div><a href="/findings?sort=priority">View all →</a></div>
     {% if urgent_findings %}
     <div class="urgent-list">
       {% for finding in urgent_findings %}
@@ -47,7 +47,7 @@
     {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>No urgent findings</strong><p>High-risk findings will appear here.</p></div>{% endif %}
   </section>
 
-  <section class="dashboard-section recent-section">
+  <section class="dashboard-section recent-section" id="scan-history">
     <div class="section-heading"><div><span class="section-kicker">Recent activity</span><h2>Recent scans</h2></div><a href="/scans/new">New →</a></div>
     {% if scans %}<div class="recent-list">
       {% for scan in scans[:6] %}

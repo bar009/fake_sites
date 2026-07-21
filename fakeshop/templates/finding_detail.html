@@ -3,16 +3,23 @@
 {% block title %}{{ finding.domain }} — Fake Shop Checker{% endblock %}
 {% block content %}
 <header class="page-header finding-header">
-  <div><a class="back-link" href="/scans/{{ finding.scan_id }}">← Back to scan</a><span class="section-kicker">Finding #{{ finding.id }}</span><h1>{{ finding.registrable_domain or finding.domain }}</h1><p>{{ finding.brand }} · {{ finding.topic or 'No topic' }}{% if related %} · {{ related|length + 1 }} related pages{% endif %}</p></div>
-  <div class="score-stack">{{ risk_badge(finding.risk_level, finding.risk_score) }}<div class="priority-card"><strong>{{ finding.priority_score }}</strong><span>Priority / 100</span></div></div>
+  <div><a class="back-link" href="/findings">← Back to investigations</a><span class="section-kicker">Website case #{{ finding.id }}</span><h1>{{ finding.registrable_domain or finding.domain }}</h1><p>{{ finding.brand }} · {{ finding.topic or 'No topic' }}{% if related %} · {{ related|length + 1 }} related pages{% endif %}</p></div>
+  <div class="case-header-state"><span>Analyst status</span>{{ status_badge(finding.review_status) }}</div>
 </header>
+<section class="case-summary-grid" aria-label="Investigation indicators">
+  <article class="indicator-stat indicator-risk-{{ finding.risk_level }}"><span>Risk score</span><strong>{{ finding.risk_score }}<small>/100</small></strong><p>{{ finding.risk_level|capitalize }} likelihood indicators</p></article>
+  <article class="indicator-stat"><span>Detected indicators</span><strong>{{ finding.evidence|length }}</strong><p>Explainable scoring signals</p></article>
+  <article class="indicator-stat"><span>Domain age</span><strong>{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }}<small> days</small>{% else %}—{% endif %}</strong><p>{% if finding.domain_age_days is not none and finding.domain_age_days <= 180 %}Recently registered{% else %}Registration context{% endif %}</p></article>
+  <article class="indicator-stat indicator-priority"><span>Investigation priority</span><strong>{{ finding.priority_score }}<small>/100</small></strong><p>Risk plus business impact</p></article>
+</section>
+<div class="case-disclaimer">{{ icon('alert', 17) }}<span><strong>Indicator-based assessment, not a verdict.</strong> Review the screenshot and evidence before reporting this domain to the brand.</span></div>
 <div class="finding-layout">
   <section class="evidence-pane">
+    <div class="hostile-url"><div><span>Potentially hostile URL — text only</span><code id="hostile-url">{{ finding.url }}</code></div><button class="button button-quiet" type="button" data-copy-target="hostile-url" data-copy-message="URL copied">{{ icon('copy', 16) }} Copy URL</button></div>
     <article class="panel-card screenshot-card">
       <div class="panel-title"><div><span class="section-kicker">Visual evidence</span><h2>Full-page screenshot</h2></div>{% if finding.screenshot_path %}<a class="button button-quiet button-small" href="/findings/{{ finding.id }}/screenshot" target="_blank" rel="noopener">Open full size</a>{% endif %}</div>
       {% if finding.screenshot_path %}<div class="screenshot-scroll"><img src="/findings/{{ finding.id }}/screenshot" alt="Full-page screenshot of the suspect site"></div>{% else %}<div class="empty-panel large">{{ icon('shield', 28) }}<strong>Screenshot unavailable</strong></div>{% endif %}
     </article>
-    <div class="hostile-url"><div><span>Potentially hostile URL — text only</span><code id="hostile-url">{{ finding.url }}</code></div><button class="button button-quiet" type="button" data-copy-target="hostile-url">{{ icon('copy', 16) }} Copy</button></div>
 
     <article class="panel-card discovery-card">
       <div class="panel-title"><div><span class="section-kicker">Discovery trail</span><h2>How it was found</h2></div></div>
@@ -31,6 +38,15 @@
     {% if related %}<article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Domain group</span><h2>Other pages from this domain</h2></div></div><div class="related-list">{% for item in related %}<a href="/findings/{{ item.id }}"><span><strong>{{ item.page_title or item.search_title or item.domain }}</strong><code>{{ item.url }}</code></span><span>{{ item.risk_score }}</span>{{ icon('chevron', 16) }}</a>{% endfor %}</div></article>{% endif %}
   </section>
   <aside class="case-pane">
+    <article class="panel-card report-card"><div class="panel-title"><div><span class="section-kicker">Brand outreach</span><h2>Copy case summary</h2></div>{{ icon('copy', 18) }}</div><div class="report-summary" id="case-summary">Potential brand impersonation case
+Brand: {{ finding.brand }}
+Suspect URL: {{ finding.url }}
+Registered domain: {{ finding.registrable_domain or finding.domain }}
+Risk score: {{ finding.risk_score }}/100 ({{ finding.risk_level }})
+Priority score: {{ finding.priority_score }}/100
+Detected indicators: {{ finding.evidence|length }}
+Captured: {{ finding.created_at }}
+Analyst status: {{ finding.review_status }}</div><p class="context-note">Verify the evidence and add your contact details before sending this summary to a brand or abuse team.</p><button class="button button-primary" type="button" data-copy-target="case-summary" data-copy-message="Case summary copied">{{ icon('copy', 16) }} Copy summary</button></article>
     <article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Business impact</span><h2>{{ finding.parent_company or 'Company not mapped' }}</h2></div>{{ status_badge(finding.mapping_status or 'pending') }}</div><dl class="data-list"><div><dt>Ticker</dt><dd>{{ finding.ticker or '—' }}</dd></div><div><dt>Market cap</dt><dd>{{ finding.market_cap_usd|money }}</dd></div><div><dt>Source</dt><dd>{{ finding.finance_source or '—' }}</dd></div><div><dt>Updated</dt><dd>{{ finding.finance_fetched_at or '—' }}</dd></div><div><dt>Source error</dt><dd>{{ finding.finance_error or '—' }}</dd></div></dl></article>
     <article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Brand context</span><h2>Official context</h2></div>{% if finding.official_domain_match is sameas true %}<span class="context-chip context-match">Matches official domain</span>{% elif finding.official_domain_match is sameas false %}<span class="context-chip">Differs from official domain</span>{% endif %}</div><dl class="data-list"><div><dt>Official domain</dt><dd>{{ finding.official_domain or '—' }}</dd></div><div><dt>Registered domain</dt><dd>{{ finding.registrable_domain or finding.domain }}</dd></div></dl><p class="context-note">Official-domain matching is context only and never changes the risk score automatically.</p></article>
     <article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Domain intelligence</span><h2>RDAP data</h2></div></div><dl class="data-list"><div><dt>Domain age</dt><dd>{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</dd></div><div><dt>Registered</dt><dd>{{ finding.domain_created or '—' }}</dd></div><div><dt>Registrar</dt><dd>{{ finding.registrar or '—' }}</dd></div><div><dt>Country</dt><dd>{{ finding.country or '—' }}</dd></div><div><dt>HTTP status</dt><dd>{{ finding.http_status or '—' }}</dd></div></dl></article>

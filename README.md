@@ -4,22 +4,85 @@ Fake Shop Checker is a local research application for finding `.shop` websites t
 
 > The system prioritizes findings for human review. It does not claim that a website is definitively fake.
 
-## Installation
+## Run on Windows
+
+This guide is written for people who do not use Python or Git every day. The application runs only on your computer; it does not publish a website to the internet.
+
+### 1. Install Python
+
+1. Download Python 3.11 or newer from [python.org/downloads/windows](https://www.python.org/downloads/windows/).
+2. Start the installer.
+3. On the first installer screen, select **Add python.exe to PATH**, then choose **Install Now**.
+4. When installation finishes, open PowerShell and check that Python works:
 
 ```powershell
-cd C:\dev\fake-shop-checker
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\playwright install chromium
+py --version
 ```
+
+You should see `Python 3.11` or a newer version.
+
+### 2. Download Fake Shop Checker (no Git required)
+
+1. Download the [latest `main` branch ZIP](https://github.com/bar009/fake_sites/archive/refs/heads/main.zip).
+2. If your browser asks for confirmation, choose **Keep** or **Save**. The download contains source code, not an installer.
+3. Open the downloaded ZIP and select **Extract all**. Do not run the application from inside the ZIP.
+4. Open the extracted `fake_sites-main` folder in File Explorer.
+5. Right-click an empty area inside the folder and choose **Open in Terminal**.
+
+Alternatively, users who already have Git can download the project with:
+
+```powershell
+git clone --branch main --single-branch https://github.com/bar009/fake_sites.git
+cd fake_sites
+```
+
+### 3. Install the application
+
+Paste these commands into the PowerShell window one at a time:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m playwright install chromium
+```
+
+The first installation may take several minutes. Playwright also downloads a private Chromium browser used to capture suspicious pages.
+
+### 4. Start the application
+
+Run:
+
+```powershell
+.\.venv\Scripts\python.exe -m fakeshop.web
+```
+
+Wait until the terminal shows that Uvicorn is running, then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in Chrome, Edge, or Firefox. Keep the PowerShell window open while using the application.
+
+To stop the application, click the PowerShell window and press `Ctrl+C`.
+
+### Open it again later
+
+There is no need to repeat the installation. Open the extracted project folder, choose **Open in Terminal**, and run only:
+
+```powershell
+.\.venv\Scripts\python.exe -m fakeshop.web
+```
+
+Your scans, screenshots, and reports remain in the local `data` folder. Back up that folder if you want to move the investigation history to another computer.
+
+### Windows troubleshooting
+
+- **`py` is not recognized:** reinstall Python and select **Add python.exe to PATH**, then close and reopen PowerShell.
+- **`No module named ...`:** make sure the terminal is open in the extracted project folder, then repeat the four commands under **Install the application**.
+- **Chromium is missing:** run `.\.venv\Scripts\python.exe -m playwright install chromium` again.
+- **Port 8000 is already in use:** the application may already be running in another PowerShell window. Open [http://127.0.0.1:8000](http://127.0.0.1:8000), or stop the older process with `Ctrl+C`.
+- **The computer went to sleep during a scan:** no local application can scan while Windows is asleep. When the application is running again, unfinished scans are automatically returned to the queue. A single timed-out website is retried once and cannot stop the rest of the batch.
+- **Windows on an ARM64 computer:** if installing `ddgs` fails, follow the Windows ARM64 commands documented at the top of `requirements.txt`.
+
+The server listens on `127.0.0.1` only, so other computers on the network cannot open it. Windows Firewall access is not required for normal local use.
 
 ## Local web interface
-
-```powershell
-.venv\Scripts\python -m fakeshop.web
-```
-
-Open `http://127.0.0.1:8000` after startup. The server listens on localhost only.
 
 The web interface can:
 
