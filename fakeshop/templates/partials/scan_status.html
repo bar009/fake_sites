@@ -1,7 +1,8 @@
 {% from "macros/ui.html" import status_badge %}
 <section class="progress-card" {% if scan.status in active_statuses %}hx-get="/scans/{{ scan.id }}/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
-  <div class="progress-copy"><div>{{ status_badge(scan.status) }}<strong>{{ scan.progress_current }} of {{ scan.progress_total }} target{% if scan.progress_total != 1 %}s{% endif %}</strong></div><span>{{ ((scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0)|round|int }}%</span></div>
+  <div class="progress-copy"><div>{{ status_badge(scan.status) }}<strong>{{ scan.progress_current }} of {{ scan.progress_total }} target{% if scan.progress_total != 1 %}s{% endif %}</strong>{% if scan.current_target %}<small>Current target: {{ scan.current_target }}</small>{% endif %}</div><span>{{ ((scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0)|round|int }}%</span></div>
   <div class="progress-track"><i style="width:{{ (scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0 }}%"></i></div>
   {% if scan.error %}<p class="error-box">{{ scan.error }}</p>{% endif %}
+  {% if scan.recovery_note %}<p class="recovery-note">{{ scan.recovery_note }}{% if scan.heartbeat_at %} Last heartbeat: <bdi>{{ scan.heartbeat_at }}</bdi>.{% endif %}</p>{% endif %}
   <div class="progress-actions">{% if scan.status in ['running','queued'] %}<form method="post" action="/scans/{{ scan.id }}/cancel"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-quiet" type="submit">Stop scan</button></form>{% elif scan.status in ['cancelled','failed','interrupted'] %}<form method="post" action="/scans/{{ scan.id }}/resume"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-primary" type="submit">Resume scan</button></form>{% endif %}</div>
 </section>

@@ -32,6 +32,12 @@ The web interface can:
 
 Application data is stored under `data/` and is excluded from Git. Market-cap data comes from Yahoo Finance through the unofficial `yfinance` package. It is intended for personal research and may be missing or delayed. The source and update time are displayed on every screen.
 
+### Scan recovery and timeouts
+
+Interrupted scans are returned to the queue automatically when the web process starts again. Each brand target runs in a disposable child process with a heartbeat and a hard safety deadline. A timed-out or crashed target is retried once in a fresh process; if it still fails, the target is marked failed and the rest of the batch continues.
+
+The default target deadline is `120 + (top_n × 45)` seconds. Set `FAKESHOP_TARGET_TIMEOUT_SECONDS` in `.env` to use a fixed deadline (minimum 30 seconds). Worker diagnostics are stored under `data/worker/` and remain excluded from Git.
+
 ## CSV format
 
 The `brand` column is required. All other columns are optional:

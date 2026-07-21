@@ -13,7 +13,7 @@ from fakeshop.brand_identity import brand_key, canonical_brand_name
 from fakeshop.whois_check import domain_of, registrable_domain
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def utc_now() -> str:
@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS scan_runs (
     created_at TEXT NOT NULL,
     started_at TEXT NOT NULL DEFAULT '',
     finished_at TEXT NOT NULL DEFAULT '',
-    error TEXT NOT NULL DEFAULT ''
+    error TEXT NOT NULL DEFAULT '',
+    heartbeat_at TEXT NOT NULL DEFAULT '',
+    current_target TEXT NOT NULL DEFAULT '',
+    recovery_note TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS scan_targets (
     id INTEGER PRIMARY KEY,
@@ -62,7 +65,10 @@ CREATE TABLE IF NOT EXISTS scan_targets (
     brand_id INTEGER NOT NULL REFERENCES brands(id),
     input_url TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'pending',
-    error TEXT NOT NULL DEFAULT ''
+    error TEXT NOT NULL DEFAULT '',
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    started_at TEXT NOT NULL DEFAULT '',
+    finished_at TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS findings (
     id INTEGER PRIMARY KEY,
@@ -124,6 +130,7 @@ class Repository:
 
     def _migrate(self) -> None:
         with self.connect() as connection:
+            old_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             columns = {
                 row["name"] for row in connection.execute("PRAGMA table_info(findings)").fetchall()
             }
@@ -137,6 +144,30 @@ class Repository:
                 if name not in columns:
                     connection.execute(f"ALTER TABLE findings ADD COLUMN {name} {declaration}")
 
+            table_additions = {
+                "scan_runs": {
+                    "heartbeat_at": "TEXT NOT NULL DEFAULT ''",
+                    "current_target": "TEXT NOT NULL DEFAULT ''",
+                    "recovery_note": "TEXT NOT NULL DEFAULT ''",
+                },
+                "scan_targets": {
+                    "attempt_count": "INTEGER NOT NULL DEFAULT 0",
+                    "started_at": "TEXT NOT NULL DEFAULT ''",
+                    "finished_at": "TEXT NOT NULL DEFAULT ''",
+                },
+            }
+            for table, additions_for_table in table_additions.items():
+                existing = {
+                    row["name"] for row in connection.execute(
+                        f"PRAGMA table_info({table})"
+                    ).fetchall()
+                }
+                for name, declaration in additions_for_table.items():
+                    if name not in existing:
+                        connection.execute(
+                            f"ALTER TABLE {table} ADD COLUMN {name} {declaration}"
+                        )
+
             rows = connection.execute(
                 "SELECT id, domain FROM findings WHERE registrable_domain=''"
             ).fetchall()
@@ -147,7 +178,7 @@ class Repository:
                 )
 
             self._merge_duplicate_brands(connection)
-            if int(connection.execute("PRAGMA user_version").fetchone()[0]) < 3:
+            if old_version < 3:
                 self._translate_historical_evidence(connection)
             connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
@@ -343,12 +374,17 @@ class Repository:
     def recover_interrupted(self) -> None:
         with self.connect() as connection:
             connection.execute(
-                "UPDATE scan_runs SET status='interrupted' WHERE status='running'"
+                """UPDATE scan_runs
+                   SET status='queued', cancel_requested=0, current_target='',
+                       heartbeat_at=?, recovery_note='Automatically resumed after the worker stopped.'
+                   WHERE status IN ('running','interrupted')""",
+                (utc_now(),),
             )
             connection.execute(
-                """UPDATE scan_targets SET status='pending'
+                """UPDATE scan_targets
+                   SET status='pending', error='', finished_at=''
                    WHERE status='running' AND scan_id IN
-                       (SELECT id FROM scan_runs WHERE status='interrupted')"""
+                       (SELECT id FROM scan_runs WHERE status='queued')"""
             )
 
     def claim_next_scan(self):
@@ -360,10 +396,12 @@ class Repository:
             if not row:
                 return None
             connection.execute(
-                "UPDATE scan_runs SET status='running', started_at=?, error='' WHERE id=?",
-                (utc_now(), row["id"]),
+                """UPDATE scan_runs SET status='running',
+                       started_at=CASE WHEN started_at='' THEN ? ELSE started_at END,
+                       heartbeat_at=?, error='' WHERE id=?""",
+                (utc_now(), utc_now(), row["id"]),
             )
-            return dict(row) | {"status": "running"}
+            return dict(row) | {"status": "running", "heartbeat_at": utc_now()}
 
     def get_scan(self, scan_id: int):
         with self.connect() as connection:
@@ -415,8 +453,28 @@ class Repository:
 
     def set_target_status(self, target_id: int, status: str, error: str = "") -> None:
         with self.connect() as connection:
+            if status == "running":
+                connection.execute(
+                    """UPDATE scan_targets SET status=?, error=?, started_at=?,
+                              finished_at='', attempt_count=attempt_count+1 WHERE id=?""",
+                    (status, error, utc_now(), target_id),
+                )
+            elif status in {"completed", "failed"}:
+                connection.execute(
+                    "UPDATE scan_targets SET status=?, error=?, finished_at=? WHERE id=?",
+                    (status, error, utc_now(), target_id),
+                )
+            else:
+                connection.execute(
+                    "UPDATE scan_targets SET status=?, error=? WHERE id=?",
+                    (status, error, target_id),
+                )
+
+    def heartbeat_scan(self, scan_id: int, current_target: str = "") -> None:
+        with self.connect() as connection:
             connection.execute(
-                "UPDATE scan_targets SET status=?, error=? WHERE id=?", (status, error, target_id)
+                "UPDATE scan_runs SET heartbeat_at=?, current_target=? WHERE id=?",
+                (utc_now(), current_target[:200], scan_id),
             )
 
     def advance_scan(self, scan_id: int) -> None:
@@ -428,8 +486,9 @@ class Repository:
     def finish_scan(self, scan_id: int, status: str = "completed", error: str = "") -> None:
         with self.connect() as connection:
             connection.execute(
-                "UPDATE scan_runs SET status=?, finished_at=?, error=? WHERE id=?",
-                (status, utc_now(), error, scan_id),
+                """UPDATE scan_runs SET status=?, finished_at=?, error=?,
+                          heartbeat_at=?, current_target='' WHERE id=?""",
+                (status, utc_now(), error, utc_now(), scan_id),
             )
 
     def request_cancel(self, scan_id: int) -> None:
@@ -447,7 +506,8 @@ class Repository:
                 return False
             connection.execute(
                 """UPDATE scan_runs SET status='queued', cancel_requested=0,
-                       finished_at='', error='' WHERE id=?""", (scan_id,)
+                       finished_at='', error='', recovery_note='Resumed manually.' WHERE id=?""",
+                (scan_id,)
             )
             connection.execute(
                 "UPDATE scan_targets SET status='pending' WHERE scan_id=? AND status='running'",

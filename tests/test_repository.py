@@ -32,17 +32,24 @@ def test_scan_lifecycle_and_review(tmp_path: Path):
     assert repository.get_finding(finding_id)["review_status"] == "confirmed"
 
 
-def test_interrupted_scan_can_resume(tmp_path: Path):
+def test_interrupted_scan_is_automatically_requeued(tmp_path: Path):
     repository = Repository(tmp_path / "app.db")
     scan_id = repository.create_scan(
         kind="brand", provider="ddgs", top_n=3, source_name="A",
         targets=[{"brand": "A"}],
     )
     repository.claim_next_scan()
+    target = repository.pending_targets(scan_id)[0]
+    repository.set_target_status(target["id"], "running")
+    repository.heartbeat_scan(scan_id, "A")
     repository.recover_interrupted()
-    assert repository.get_scan(scan_id)["status"] == "interrupted"
-    assert repository.resume_scan(scan_id)
-    assert repository.get_scan(scan_id)["status"] == "queued"
+    recovered = repository.get_scan(scan_id)
+    assert recovered["status"] == "queued"
+    assert recovered["current_target"] == ""
+    assert "Automatically resumed" in recovered["recovery_note"]
+    assert repository.pending_targets(scan_id)[0]["status"] == "pending"
+    assert repository.claim_next_scan()["id"] == scan_id
+    assert repository.get_scan(scan_id)["status"] == "running"
 
 
 def test_finding_metadata_grouping_targets_and_priority_refresh(tmp_path: Path):
@@ -114,7 +121,7 @@ def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: P
         assert connection.execute("SELECT brand_id FROM scan_targets WHERE id=?", (target_id,)).fetchone()[0] == first
         assert connection.execute("SELECT brand_id FROM findings WHERE id=?", (finding_id,)).fetchone()[0] == first
         assert connection.execute("SELECT status FROM company_mappings WHERE brand_id=?", (first,)).fetchone()[0] == "confirmed"
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
     assert list((tmp_path / "backups").glob("app-v1-*.db"))
 
 
@@ -151,5 +158,5 @@ def test_v3_migration_translates_system_evidence_but_preserves_analyst_text(tmp_
     assert finding["evidence"][1]["label"] == "טקסט היסטורי"
     assert finding["review_note"] == "הערת אנליסט נשמרת"
     with migrated.connect() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
     assert list((tmp_path / "backups").glob("app-v2-*.db"))
