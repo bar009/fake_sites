@@ -18,12 +18,12 @@
 {%- endmacro %}
 
 {% macro status_badge(status) -%}
-{% set labels = {'queued':'ממתינה בתור','running':'פעילה','completed':'הושלמה','cancelled':'נעצרה','failed':'נכשלה','interrupted':'הופסקה','pending':'ממתין','no_results':'ללא תוצאות','unreviewed':'לא נבדק','confirmed':'חשוד מאומת','false_positive':'False positive','investigate':'דורש חקירה','auto_confirmed':'אוטומטי','needs_review':'דורש אישור','no_match':'ללא התאמה','unavailable':'לא זמין'} %}
+{% set labels = {'queued':'Queued','running':'Running','completed':'Completed','cancelled':'Cancelled','failed':'Failed','interrupted':'Interrupted','pending':'Pending','no_results':'No results','unreviewed':'Unreviewed','confirmed':'Confirmed suspicious','false_positive':'False positive','investigate':'Needs investigation','auto_confirmed':'Auto-confirmed','needs_review':'Needs review','no_match':'No match','unavailable':'Unavailable'} %}
 <span class="badge badge-{{ status }}"><span class="badge-dot"></span>{{ labels.get(status, status) }}</span>
 {%- endmacro %}
 
 {% macro risk_badge(level, score) -%}
-{% set labels = {'high':'גבוה','medium':'בינוני','low':'נמוך'} %}
+{% set labels = {'high':'High','medium':'Medium','low':'Low'} %}
 <span class="risk-badge risk-{{ level }}"><strong>{{ score }}</strong><small>{{ labels.get(level, level) }}</small></span>
 {%- endmacro %}
 

@@ -17,8 +17,8 @@ def test_dashboard_and_brand_scan(tmp_path: Path):
     with TestClient(app) as client:
         dashboard = client.get("/")
         assert dashboard.status_code == 200
-        assert 'dir="rtl"' in dashboard.text
-        assert "Yahoo Finance דרך yfinance" in dashboard.text
+        assert 'lang="en" dir="ltr"' in dashboard.text
+        assert "Yahoo Finance through yfinance" in dashboard.text
 
         form = client.get("/scans/new")
         response = client.post(
@@ -29,7 +29,7 @@ def test_dashboard_and_brand_scan(tmp_path: Path):
         assert response.status_code == 303
         detail = client.get(response.headers["location"])
         assert "Nike" in detail.text
-        assert "ממתינה בתור" in detail.text
+        assert "Queued" in detail.text
 
 
 def test_csv_upload_and_url_validation(monkeypatch, tmp_path: Path):
@@ -78,9 +78,24 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
         assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
         partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})
-        assert "אין ממצאים מתאימים" in partial.text
+        assert "No matching findings" in partial.text
         detail = client.get(f"/findings/{finding_id}")
         assert "site:.shop query" in detail.text
         assert "Search snippet" in detail.text
         assert "example.com" in detail.text
         assert '<a href="https://example-sale.shop' not in detail.text
+        exported = client.get(f"/scans/{scan_id}/export/html")
+        assert "<html lang='en' dir='ltr'>" in exported.text
+        assert "Scan #" in exported.text
+
+
+def test_user_interface_contains_no_fixed_hebrew_copy():
+    hebrew = re.compile(r"[\u0590-\u05ff]")
+    files = list((web.PACKAGE_DIR / "templates").rglob("*.html")) + [
+        web.PACKAGE_DIR / "static" / "app.js",
+        web.PACKAGE_DIR / "static" / "vendor" / "htmx.min.js",
+    ]
+    assert not {
+        str(path): hebrew.findall(path.read_text(encoding="utf-8"))
+        for path in files if hebrew.search(path.read_text(encoding="utf-8"))
+    }

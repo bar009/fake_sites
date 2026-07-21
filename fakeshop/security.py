@@ -29,23 +29,23 @@ def resolve_public_host(host: str) -> tuple[str, ...]:
                 for item in socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
             }
         except socket.gaierror as exc:
-            raise UnsafeUrlError(f"לא ניתן לפתור את כתובת הדומיין: {host}") from exc
+            raise UnsafeUrlError(f"Could not resolve the domain: {host}") from exc
     if not addresses or any(not _is_public_ip(address) for address in addresses):
-        raise UnsafeUrlError("הכתובת מפנה לרשת פרטית או מקומית ולכן נחסמה")
+        raise UnsafeUrlError("The address points to a private or local network and was blocked")
     return tuple(sorted(addresses))
 
 
 def validate_public_url(url: str) -> str:
     parsed = urlparse(url.strip())
     if parsed.scheme not in {"http", "https"}:
-        raise UnsafeUrlError("מותר לסרוק רק כתובות HTTP או HTTPS")
+        raise UnsafeUrlError("Only HTTP or HTTPS URLs can be scanned")
     if not parsed.hostname or parsed.username or parsed.password:
-        raise UnsafeUrlError("כתובת האתר אינה תקינה")
+        raise UnsafeUrlError("The website URL is invalid")
     try:
         port = parsed.port
     except ValueError as exc:
-        raise UnsafeUrlError("הפורט בכתובת אינו תקין") from exc
+        raise UnsafeUrlError("The URL contains an invalid port") from exc
     if port and port not in {80, 443}:
-        raise UnsafeUrlError("מותר להשתמש רק בפורטים 80 ו־443")
+        raise UnsafeUrlError("Only ports 80 and 443 are allowed")
     resolve_public_host(parsed.hostname.lower())
     return parsed.geturl()

@@ -1,13 +1,10 @@
-# Fake Shop Checker — מרכז חקירת אתרי התחזות
+# Fake Shop Checker — Brand Impersonation Investigation Center
 
-מערכת מחקר מקומית שמאתרת אתרי `.shop` החשודים בהתחזות למותגים. היא מחפשת
-חתימות של תבניות זיוף, מצלמת את הדף בדפדפן מבודד, בודקת את גיל הדומיין ומציגה
-ציון סיכון מוסבר. שווי השוק של חברת האם משמש לציון עדיפות נפרד ואינו משנה את
-הקביעה אם אתר חשוד.
+Fake Shop Checker is a local research application for finding `.shop` websites that may be impersonating brands. It searches for known storefront-template fingerprints, captures pages in an isolated browser, checks domain age, and produces an explainable risk score. Parent-company market capitalization contributes to a separate priority score and does not determine whether a site is suspicious.
 
-> המערכת מיועדת לתעדוף וסקירה אנושית, לא לקביעה אוטומטית שאתר הוא מזויף.
+> The system prioritizes findings for human review. It does not claim that a website is definitively fake.
 
-## התקנה
+## Installation
 
 ```powershell
 cd C:\dev\fake-shop-checker
@@ -16,30 +13,28 @@ python -m venv .venv
 .venv\Scripts\playwright install chromium
 ```
 
-## ממשק Web מקומי
+## Local web interface
 
 ```powershell
 .venv\Scripts\python -m fakeshop.web
 ```
 
-לאחר ההפעלה פותחים `http://127.0.0.1:8000`. השרת מאזין ל־localhost בלבד.
+Open `http://127.0.0.1:8000` after startup. The server listens on localhost only.
 
-בממשק אפשר:
+The web interface can:
 
-- להעלות CSV של מותגים.
-- לסרוק מותג יחיד או URL מסוים.
-- לעקוב אחר עבודות רקע, לעצור ולהמשיך אותן.
-- לראות צילומי מסך, ציון סיכון, ראיות וציון עדיפות.
-- לסמן ממצא כלא נבדק, חשוד מאומת, false positive או דורש חקירה.
-- לייצא JSON, Excel או HTML.
+- Upload a CSV file of brands.
+- Scan one brand or a specific URL.
+- Track, stop, and resume persistent background jobs.
+- Display screenshots, risk scores, evidence, and priority scores.
+- Mark a finding as unreviewed, confirmed suspicious, false positive, or requiring investigation.
+- Export JSON, Excel, or HTML reports.
 
-הנתונים נשמרים ב־`data/` ואינם עולים ל־Git. נתוני שווי מתקבלים דרך `yfinance`
-מ־Yahoo Finance באופן לא רשמי, מיועדים למחקר אישי ועלולים להיות חסרים או
-מעוכבים. המקור וזמן העדכון מוצגים בכל מסך.
+Application data is stored under `data/` and is excluded from Git. Market-cap data comes from Yahoo Finance through the unofficial `yfinance` package. It is intended for personal research and may be missing or delayed. The source and update time are displayed on every screen.
 
-## CSV
+## CSV format
 
-העמודה `brand` היא חובה. יתר העמודות אופציונליות:
+The `brand` column is required. All other columns are optional:
 
 ```csv
 brand,topic,parent_company,ticker,official_domain
@@ -47,42 +42,38 @@ Nike,sportswear,Nike Inc,NKE,nike.com
 Lego,toys,,,
 ```
 
-ערכי `parent_company` ו־`ticker` מפורשים גוברים על המיפוי האוטומטי.
+Explicit `parent_company` and `ticker` values take precedence over automatic mapping.
 
-המאגר כולל גם את `brands_1000.csv`: קטלוג מורחב של 1,000 יעדי סריקה ב־50
-תחומים. הוא משלב 300 מותגים צרכניים בעלי סיכון התחזות גבוה עם 700 חברות
-ציבוריות גדולות, שנבחרו לפי שווי שוק מנתוני [Nasdaq Stock Screener](https://www.nasdaq.com/market-activity/stocks/screener)
-ונוקו מכפילויות של סוגי מניה וניירות ערך. שדה `official_domain` נשאר ריק כאשר
-לא היה מקור מאומת, כדי לא להכניס כתובות מנוחשות.
+The repository also contains `brands_1000.csv`, an expanded catalog of 1,000 scan targets across 50 topics. It combines 300 consumer brands with a high impersonation risk and 700 large public companies selected by market capitalization from the [Nasdaq Stock Screener](https://www.nasdaq.com/market-activity/stocks/screener). Duplicate share classes and securities were removed. `official_domain` remains blank when no verified source was available, avoiding guessed domains.
 
-## CLI קיים
+## Existing CLI
 
-דרך ההפעלה המקורית נשמרה:
+The original command remains available:
 
 ```powershell
 .venv\Scripts\python check_brands.py brands.csv
 ```
 
-אפשרויות שימושיות:
+Useful options:
 
-- `--top 5` — מספר תוצאות למותג.
-- `--brand Nike` — מותג יחיד מתוך הקובץ.
-- `--topic watches` — נושא יחיד.
-- `--resume` — המשך הריצה האחרונה שנקטעה.
-- `--provider brave` — שימוש ב־Brave Search API עם `BRAVE_API_KEY` בקובץ `.env`.
+- `--top 5` — number of results per brand.
+- `--brand Nike` — scan one brand from the file.
+- `--topic watches` — scan one topic.
+- `--resume` — resume the latest interrupted run.
+- `--provider brave` — use the Brave Search API with `BRAVE_API_KEY` in `.env`.
 
-פלטי CLI נשמרים תחת `runs/` ומוחרגים מ־Git.
+CLI outputs are stored under `runs/` and excluded from Git.
 
-## בטיחות
+## Safety
 
-האתרים הנבדקים עלולים להיות עוינים. המערכת:
+Scanned websites may be hostile. The application:
 
-- מציגה URL כטקסט להעתקה ולא כקישור לחיץ.
-- חוסמת localhost, כתובות פרטיות, link-local ופורטים שאינם 80/443.
-- יוצרת browser context זמני לכל אתר וחוסמת הורדות ו־service workers.
-- אינה לוחצת, ממלאת טפסים או מורידה קבצים.
+- Displays suspect URLs as copyable text rather than clickable links in the investigation UI.
+- Blocks localhost, private and link-local addresses, and ports other than 80/443.
+- Creates a temporary browser context for each site and blocks downloads and service workers.
+- Does not click, submit forms, or download files.
 
-## בדיקות
+## Tests
 
 ```powershell
 .venv\Scripts\pip install -r requirements-dev.txt
@@ -91,8 +82,8 @@ Lego,toys,,,
 
 ## Next steps
 
-- מחקר חתימות חיפוש נוספות מעבר ל־`What Our Customers Say`.
-- הרחבה מבוקרת ל־`.store`, `.online`, `.site` וסיומות נוספות.
-- Certificate Transparency, דומיינים דומים, passive DNS ומאגרי abuse.
-- ניטור מתוזמן, השוואה בין ריצות והתראות.
-- מקור פיננסי מורשה אם המערכת תעבור לשימוש מסחרי.
+- Research additional search fingerprints beyond `What Our Customers Say`.
+- Carefully expand to `.store`, `.online`, `.site`, and other TLDs.
+- Add Certificate Transparency, similar-domain, passive DNS, and abuse-data discovery.
+- Add scheduled monitoring, run comparison, and alerts.
+- Move to a licensed financial-data source if the application becomes commercial.

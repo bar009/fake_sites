@@ -114,5 +114,42 @@ def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: P
         assert connection.execute("SELECT brand_id FROM scan_targets WHERE id=?", (target_id,)).fetchone()[0] == first
         assert connection.execute("SELECT brand_id FROM findings WHERE id=?", (finding_id,)).fetchone()[0] == first
         assert connection.execute("SELECT status FROM company_mappings WHERE brand_id=?", (first,)).fetchone()[0] == "confirmed"
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
     assert list((tmp_path / "backups").glob("app-v1-*.db"))
+
+
+def test_v3_migration_translates_system_evidence_but_preserves_analyst_text(tmp_path: Path):
+    db_path = tmp_path / "app.db"
+    repository = Repository(db_path)
+    scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Example",
+        targets=[{"brand": "Example"}],
+    )
+    target = repository.pending_targets(scan_id)[0]
+    finding_id = repository.add_finding(
+        scan_id=scan_id, brand_id=target["brand_id"],
+        row={"url": "https://example-outlet.shop", "domain": "example-outlet.shop",
+             "domain_age_days": 12, "final_url": "https://other.shop"},
+        assessment={"score": 50, "level": "medium", "evidence": [
+            {"code": "young_domain", "label": "דומיין חדש", "points": 25,
+             "detail": "הדומיין נרשם לפני 12 ימים"},
+            {"code": "custom", "label": "טקסט היסטורי", "points": 0,
+             "detail": "נשמר ללא שינוי"},
+        ]},
+        priority=50,
+    )
+    repository.update_review(finding_id, "investigate", "הערת אנליסט נשמרת")
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("PRAGMA user_version=2")
+
+    migrated = Repository(db_path)
+    finding = migrated.get_finding(finding_id)
+    assert finding["evidence"][0] == {
+        "code": "young_domain", "label": "Newly registered domain", "points": 25,
+        "detail": "The domain was registered 12 days ago",
+    }
+    assert finding["evidence"][1]["label"] == "טקסט היסטורי"
+    assert finding["review_note"] == "הערת אנליסט נשמרת"
+    with migrated.connect() as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert list((tmp_path / "backups").glob("app-v2-*.db"))

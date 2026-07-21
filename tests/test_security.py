@@ -6,7 +6,7 @@ from fakeshop.security import UnsafeUrlError, resolve_public_host, validate_publ
 
 
 def test_rejects_non_http_and_credentials():
-    with pytest.raises(UnsafeUrlError):
+    with pytest.raises(UnsafeUrlError, match="Only HTTP or HTTPS"):
         validate_public_url("file:///etc/passwd")
     with pytest.raises(UnsafeUrlError):
         validate_public_url("https://user:pass@example.com")
@@ -17,7 +17,7 @@ def test_rejects_private_dns(monkeypatch):
     monkeypatch.setattr(socket, "getaddrinfo", lambda *args, **kwargs: [
         (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))
     ])
-    with pytest.raises(UnsafeUrlError):
+    with pytest.raises(UnsafeUrlError, match="private or local network"):
         validate_public_url("https://internal.example")
 
 

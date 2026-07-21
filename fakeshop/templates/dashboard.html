@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 {% from "macros/ui.html" import icon, kpi, risk_badge, status_badge %}
-{% block title %}לוח בקרה — Fake Shop Checker{% endblock %}
+{% block title %}Overview — Fake Shop Checker{% endblock %}
 {% block content %}
 <header class="page-header">
-  <div><span class="section-kicker">Security operations</span><h1>לוח בקרה</h1><p>ממצאים דחופים, סריקות פעילות ותמונת מצב עדכנית.</p></div>
-  <a class="button button-primary" href="/scans/new">{{ icon('scan', 17) }} סריקה חדשה</a>
+  <div><span class="section-kicker">Security operations</span><h1>Overview</h1><p>Urgent findings, active scans, and the latest operational picture.</p></div>
+  <a class="button button-primary" href="/scans/new">{{ icon('scan', 17) }} New scan</a>
 </header>
 
-<section class="kpi-grid" aria-label="מדדי מערכת">
-  {{ kpi('דומיינים ייחודיים', stats.findings, 'לפי דומיין רשום', 'shield', 'blue') }}
-  {{ kpi('סיכון גבוה', stats.high, 'דורשים תשומת לב', 'alert', 'red') }}
-  {{ kpi('ממתינים לסקירה', stats.pending_review, 'טרם נבדקו אנושית', 'activity', 'amber') }}
-  {{ kpi('סריקות', stats.scans, 'בכל ההיסטוריה', 'scan', 'cyan') }}
+<section class="kpi-grid" aria-label="System metrics">
+  {{ kpi('Unique domains', stats.findings, 'Grouped by registered domain', 'shield', 'blue') }}
+  {{ kpi('High risk', stats.high, 'Require attention', 'alert', 'red') }}
+  {{ kpi('Awaiting review', stats.pending_review, 'Not yet reviewed by an analyst', 'activity', 'amber') }}
+  {{ kpi('Scans', stats.scans, 'Across all history', 'scan', 'cyan') }}
 </section>
 
 {% if active_scans %}
 <section class="dashboard-section">
-  <div class="section-heading"><div><span class="section-kicker">Live queue</span><h2>סריקות פעילות</h2></div><span class="section-count">{{ active_scans|length }}</span></div>
+  <div class="section-heading"><div><span class="section-kicker">Live queue</span><h2>Active scans</h2></div><span class="section-count">{{ active_scans|length }}</span></div>
   <div class="active-grid">
     {% for scan in active_scans %}
     <a class="active-scan-card" href="/scans/{{ scan.id }}">
       <div><span class="pulse-dot"></span>{{ status_badge(scan.status) }}</div>
       <strong>{{ scan.source_name or scan.kind }}</strong>
-      <small>{{ scan.progress_current }} מתוך {{ scan.progress_total }} יעדים</small>
+      <small>{{ scan.progress_current }} of {{ scan.progress_total }} target{% if scan.progress_total != 1 %}s{% endif %}</small>
       <span class="progress-track"><i style="width:{{ (scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0 }}%"></i></span>
     </a>
     {% endfor %}
@@ -32,33 +32,33 @@
 
 <div class="dashboard-grid">
   <section class="dashboard-section urgent-section">
-    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>ממצאים דחופים</h2></div><small>לא כולל False positive</small></div>
+    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Urgent findings</h2></div><small>Excludes false positives</small></div>
     {% if urgent_findings %}
     <div class="urgent-list">
       {% for finding in urgent_findings %}
       <a class="urgent-row" href="/findings/{{ finding.id }}">
         {{ risk_badge(finding.risk_level, finding.risk_score) }}
-        <span class="urgent-identity"><strong dir="ltr">{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · עדיפות {{ finding.priority_score }}</small></span>
+        <span class="urgent-identity"><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · Priority {{ finding.priority_score }}</small></span>
         {{ status_badge(finding.review_status) }}
         {{ icon('chevron', 17) }}
       </a>
       {% endfor %}
     </div>
-    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>אין ממצאים דחופים</strong><p>ממצאים בסיכון גבוה יופיעו כאן.</p></div>{% endif %}
+    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>No urgent findings</strong><p>High-risk findings will appear here.</p></div>{% endif %}
   </section>
 
   <section class="dashboard-section recent-section">
-    <div class="section-heading"><div><span class="section-kicker">Recent activity</span><h2>סריקות אחרונות</h2></div><a href="/scans/new">חדשה ←</a></div>
+    <div class="section-heading"><div><span class="section-kicker">Recent activity</span><h2>Recent scans</h2></div><a href="/scans/new">New →</a></div>
     {% if scans %}<div class="recent-list">
       {% for scan in scans[:6] %}
       <a class="recent-row" href="/scans/{{ scan.id }}">
         <span class="scan-number">#{{ scan.id }}</span>
         <span><strong>{{ scan.source_name or scan.kind }}</strong><small>{{ scan.created_at }}</small></span>
         {{ status_badge(scan.status) }}
-        <span class="recent-metric"><strong>{{ scan.finding_count }}</strong><small>דומיינים</small></span>
+        <span class="recent-metric"><strong>{{ scan.finding_count }}</strong><small>domains</small></span>
       </a>
       {% endfor %}
-    </div>{% else %}<div class="empty-panel compact"><strong>אין עדיין סריקות</strong><p>התחילו עם CSV, מותג או URL.</p><a class="button button-primary" href="/scans/new">לסריקה הראשונה</a></div>{% endif %}
+    </div>{% else %}<div class="empty-panel compact"><strong>No scans yet</strong><p>Start with a CSV file, one brand, or a URL.</p><a class="button button-primary" href="/scans/new">Start the first scan</a></div>{% endif %}
   </section>
 </div>
 {% endblock %}

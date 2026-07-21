@@ -13,7 +13,7 @@ from fakeshop.brand_identity import brand_key, canonical_brand_name
 from fakeshop.whois_check import domain_of, registrable_domain
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def utc_now() -> str:
@@ -147,7 +147,53 @@ class Repository:
                 )
 
             self._merge_duplicate_brands(connection)
+            if int(connection.execute("PRAGMA user_version").fetchone()[0]) < 3:
+                self._translate_historical_evidence(connection)
             connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+
+    @staticmethod
+    def _translate_historical_evidence(connection: sqlite3.Connection) -> None:
+        """Translate known system-generated evidence while preserving unknown/user text."""
+        labels = {
+            "template_fingerprint": "Storefront template fingerprint",
+            "secondary_template_marker": "Secondary template marker",
+            "young_domain": "Newly registered domain",
+            "recent_domain": "Domain registered within the past year",
+            "brand_domain_pattern": "Brand impersonation domain pattern",
+            "cross_domain_redirect": "Cross-domain redirect",
+        }
+        rows = connection.execute(
+            "SELECT id, domain, final_url, domain_age_days, evidence_json FROM findings"
+        ).fetchall()
+        for row in rows:
+            evidence = json.loads(row["evidence_json"] or "[]")
+            changed = False
+            for item in evidence:
+                code = item.get("code")
+                if code not in labels:
+                    continue
+                item["label"] = labels[code]
+                if code in {"template_fingerprint", "secondary_template_marker"}:
+                    detail = item.get("detail", "")
+                    marker = detail.split('"')[1] if detail.count('"') >= 2 else "the known template phrase"
+                    item["detail"] = f'Detected the phrase "{marker}"'
+                elif code in {"young_domain", "recent_domain"}:
+                    age = row["domain_age_days"]
+                    item["detail"] = (
+                        f"The domain was registered {age} days ago"
+                        if age is not None else "The domain registration is recent"
+                    )
+                elif code == "brand_domain_pattern":
+                    item["detail"] = f"The domain name uses a brand-like commercial pattern: {row['domain']}"
+                elif code == "cross_domain_redirect":
+                    redirected = registrable_domain(domain_of(row["final_url"]))
+                    item["detail"] = f"The page redirected to {redirected or 'another domain'}"
+                changed = True
+            if changed:
+                connection.execute(
+                    "UPDATE findings SET evidence_json=? WHERE id=?",
+                    (json.dumps(evidence, ensure_ascii=False), row["id"]),
+                )
 
     @staticmethod
     def _merge_duplicate_brands(connection: sqlite3.Connection) -> None:
@@ -634,7 +680,7 @@ class Repository:
             row = connection.execute(
                 "SELECT MAX(finance_fetched_at) AS updated FROM company_mappings"
             ).fetchone()
-            return row["updated"] or "טרם עודכן"
+            return row["updated"] or "Not updated yet"
 
     def finance_status(self) -> dict:
         with self.connect() as connection:
@@ -644,7 +690,7 @@ class Repository:
                    FROM company_mappings"""
             ).fetchone()
             return {
-                "attempted": row["attempted"] or "טרם עודכן",
+                "attempted": row["attempted"] or "Not updated yet",
                 "successful": row["successful"] or "",
             }
 

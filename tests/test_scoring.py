@@ -15,6 +15,8 @@ def test_explainable_high_risk_score():
         "template_fingerprint", "secondary_template_marker", "young_domain",
         "brand_domain_pattern", "cross_domain_redirect",
     }
+    assert all(item["label"].isascii() for item in result["evidence"])
+    assert all(item["detail"].isascii() for item in result["evidence"])
 
 
 def test_missing_information_does_not_add_risk():

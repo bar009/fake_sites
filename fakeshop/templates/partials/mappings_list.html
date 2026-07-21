@@ -2,13 +2,13 @@
 <div id="mappings-results" class="mapping-table">
 {% for mapping in mappings %}
   <article class="mapping-item">
-    <div class="mapping-brand"><strong>{{ mapping.brand }}</strong><small>{{ mapping.topic or 'ללא נושא' }}</small></div>
+    <div class="mapping-brand"><strong>{{ mapping.brand }}</strong><small>{{ mapping.topic or 'No topic' }}</small></div>
     <div>{{ status_badge(mapping.status or 'pending') }}</div>
-    <div class="mapping-company"><strong>{{ mapping.parent_company or 'חברה לא ממופה' }}</strong><small dir="ltr">{{ mapping.ticker or '—' }} · {{ mapping.market_cap_usd|money }}</small></div>
-    <div class="mapping-source"><small>{{ mapping.finance_source or 'טרם נבדק' }}</small><span dir="ltr">{{ mapping.finance_fetched_at or '—' }}</span></div>
-    {% if mapping.candidates %}<details class="candidate-drawer"><summary class="button button-quiet">בחירת התאמה</summary><div class="candidate-list">{% for candidate in mapping.candidates %}<form method="post" action="/mappings/{{ mapping.brand_id }}/confirm" hx-post="/mappings/{{ mapping.brand_id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="ticker" value="{{ candidate.ticker }}"><input type="hidden" name="company_name" value="{{ candidate.name }}"><span><strong>{{ candidate.name }}</strong><small dir="ltr">{{ candidate.ticker }} · {{ candidate.exchange }} · {{ (candidate.score*100)|round|int }}%</small></span><button class="button button-primary button-small" type="submit">אישור</button></form>{% endfor %}</div></details>{% else %}<span></span>{% endif %}
+    <div class="mapping-company"><strong>{{ mapping.parent_company or 'Company not mapped' }}</strong><small>{{ mapping.ticker or '—' }} · {{ mapping.market_cap_usd|money }}</small></div>
+    <div class="mapping-source"><small>{{ mapping.finance_source or 'Not checked yet' }}</small><span>{{ mapping.finance_fetched_at or '—' }}</span></div>
+    {% if mapping.candidates %}<details class="candidate-drawer"><summary class="button button-quiet">Choose match</summary><div class="candidate-list">{% for candidate in mapping.candidates %}<form method="post" action="/mappings/{{ mapping.brand_id }}/confirm" hx-post="/mappings/{{ mapping.brand_id }}/confirm"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="ticker" value="{{ candidate.ticker }}"><input type="hidden" name="company_name" value="{{ candidate.name }}"><span><strong>{{ candidate.name }}</strong><small>{{ candidate.ticker }} · {{ candidate.exchange }} · {{ (candidate.score*100)|round|int }}%</small></span><button class="button button-primary button-small" type="submit">Confirm</button></form>{% endfor %}</div></details>{% else %}<span></span>{% endif %}
   </article>
 {% else %}
-  <div class="empty-panel"><strong>לא נמצאו מיפויים</strong><p>שנו את החיפוש או התחילו סריקה חדשה.</p></div>
+  <div class="empty-panel"><strong>No mappings found</strong><p>Change the search or start a new scan.</p></div>
 {% endfor %}
 </div>

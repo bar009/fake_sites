@@ -1,41 +1,41 @@
 {% extends "base.html" %}
 {% from "macros/ui.html" import icon %}
-{% block title %}סריקה חדשה — Fake Shop Checker{% endblock %}
+{% block title %}New Scan — Fake Shop Checker{% endblock %}
 {% block content %}
-<header class="page-header"><div><span class="section-kicker">New investigation</span><h1>סריקה חדשה</h1><p>בחרו מקור. העבודה תישמר בתור ותמשיך גם לאחר רענון הדף.</p></div></header>
+<header class="page-header"><div><span class="section-kicker">New investigation</span><h1>New scan</h1><p>Choose a source. The job is queued persistently and continues after a page refresh.</p></div></header>
 <section class="scan-workbench">
-  <div class="tabs" role="tablist" aria-label="סוג סריקה">
-    <button id="tab-csv" role="tab" aria-selected="true" aria-controls="panel-csv" data-tab="csv">{{ icon('download') }} קובץ CSV</button>
-    <button id="tab-brand" role="tab" aria-selected="false" aria-controls="panel-brand" data-tab="brand" tabindex="-1">{{ icon('search') }} מותג יחיד</button>
-    <button id="tab-url" role="tab" aria-selected="false" aria-controls="panel-url" data-tab="url" tabindex="-1">{{ icon('shield') }} כתובת URL</button>
+  <div class="tabs" role="tablist" aria-label="Scan type">
+    <button id="tab-csv" role="tab" aria-selected="true" aria-controls="panel-csv" data-tab="csv">{{ icon('download') }} CSV file</button>
+    <button id="tab-brand" role="tab" aria-selected="false" aria-controls="panel-brand" data-tab="brand" tabindex="-1">{{ icon('search') }} Single brand</button>
+    <button id="tab-url" role="tab" aria-selected="false" aria-controls="panel-url" data-tab="url" tabindex="-1">{{ icon('shield') }} Website URL</button>
   </div>
   <div class="tab-panel" id="panel-csv" role="tabpanel" aria-labelledby="tab-csv" data-tab-panel="csv">
-    <div class="form-intro"><span class="form-icon">{{ icon('download', 22) }}</span><div><h2>רשימת מותגים</h2><p>העלאת CSV לסריקת אצווה. עמודת <code>brand</code> חובה.</p></div></div>
+    <div class="form-intro"><span class="form-icon">{{ icon('download', 22) }}</span><div><h2>Brand list</h2><p>Upload a CSV for a batch scan. The <code>brand</code> column is required.</p></div></div>
     <form class="modern-form" method="post" action="/scans/csv" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label class="upload-zone"><span>{{ icon('download', 28) }}</span><strong>בחירת קובץ CSV</strong><small>UTF-8 · עד 1MB · עד 2,000 מותגים</small><input required type="file" name="file" accept=".csv,text/csv"></label>
-      <div class="field-grid"><label>ספק חיפוש<select name="provider"><option value="ddgs">DuckDuckGo — ללא מפתח</option><option value="brave">Brave — דורש .env</option></select></label><label>דומיינים למותג<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
-      <button class="button button-primary" type="submit">העלאה והתחלת סריקה</button>
+      <label class="upload-zone"><span>{{ icon('download', 28) }}</span><strong>Choose a CSV file</strong><small>UTF-8 · Up to 1 MB · Up to 2,000 brands</small><input required type="file" name="file" accept=".csv,text/csv"></label>
+      <div class="field-grid"><label>Search provider<select name="provider"><option value="ddgs">DuckDuckGo — no API key</option><option value="brave">Brave — requires .env</option></select></label><label>Domains per brand<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
+      <button class="button button-primary" type="submit">Upload and start scan</button>
     </form>
   </div>
   <div class="tab-panel" id="panel-brand" role="tabpanel" aria-labelledby="tab-brand" data-tab-panel="brand" hidden>
-    <div class="form-intro"><span class="form-icon">{{ icon('search', 22) }}</span><div><h2>מותג יחיד</h2><p>חיפוש תוצאות <bdi>.shop</bdi> לפי חתימות ההתחזות.</p></div></div>
+    <div class="form-intro"><span class="form-icon">{{ icon('search', 22) }}</span><div><h2>Single brand</h2><p>Search <bdi>.shop</bdi> results for known impersonation fingerprints.</p></div></div>
     <form class="modern-form" method="post" action="/scans/brand">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>שם המותג<input required name="brand" maxlength="200" placeholder="לדוגמה: Duck Camp"></label>
-      <label>נושא, אופציונלי<input name="topic" maxlength="200" placeholder="outdoor apparel"></label>
-      <div class="field-grid"><label>ספק<select name="provider"><option value="ddgs">DuckDuckGo</option><option value="brave">Brave</option></select></label><label>דומיינים לסריקה<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
-      <button class="button button-primary" type="submit">חיפוש מותג</button>
+      <label>Brand name<input required name="brand" maxlength="200" placeholder="For example: Duck Camp"></label>
+      <label>Topic, optional<input name="topic" maxlength="200" placeholder="outdoor apparel"></label>
+      <div class="field-grid"><label>Provider<select name="provider"><option value="ddgs">DuckDuckGo</option><option value="brave">Brave</option></select></label><label>Domains to scan<input type="number" name="top_n" value="3" min="1" max="10"></label></div>
+      <button class="button button-primary" type="submit">Search brand</button>
     </form>
   </div>
   <div class="tab-panel" id="panel-url" role="tabpanel" aria-labelledby="tab-url" data-tab-panel="url" hidden>
-    <div class="form-intro"><span class="form-icon">{{ icon('shield', 22) }}</span><div><h2>כתובת חשודה</h2><p>בדיקה ישירה בדפדפן מבודד, ללא לחיצות, טפסים או הורדות.</p></div></div>
+    <div class="form-intro"><span class="form-icon">{{ icon('shield', 22) }}</span><div><h2>Suspect URL</h2><p>Inspect one URL in an isolated browser without clicks, forms, or downloads.</p></div></div>
     <form class="modern-form" method="post" action="/scans/url">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>שם המותג<input required name="brand" maxlength="200" placeholder="המותג שמתחזים אליו"></label>
-      <label>כתובת URL<input required type="url" name="url" dir="ltr" placeholder="https://example.shop/"></label>
-      <label>נושא, אופציונלי<input name="topic" maxlength="200"></label>
-      <button class="button button-primary" type="submit">בדיקת הכתובת</button>
+      <label>Brand name<input required name="brand" maxlength="200" placeholder="The brand being impersonated"></label>
+      <label>Website URL<input required type="url" name="url" placeholder="https://example.shop/"></label>
+      <label>Topic, optional<input name="topic" maxlength="200"></label>
+      <button class="button button-primary" type="submit">Inspect URL</button>
     </form>
   </div>
 </section>

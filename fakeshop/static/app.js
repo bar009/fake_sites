@@ -37,9 +37,9 @@
     if (!target) return;
     try {
       await navigator.clipboard.writeText(target.textContent.trim());
-      showToast("הכתובת הועתקה");
+      showToast("URL copied");
     } catch (_) {
-      showToast("לא ניתן להעתיק אוטומטית", "error");
+      showToast("The URL could not be copied automatically", "error");
     }
   });
 

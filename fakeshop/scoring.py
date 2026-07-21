@@ -65,12 +65,12 @@ def _brand_domain_signal(brand: str, url: str) -> str:
         return ""
 
     if _levenshtein(brand_norm, label_norm) <= 2:
-        return f"שם הדומיין דומה מאוד ל־{brand} אך אינו זהה"
+        return f"The domain name closely resembles {brand}, but is not identical"
 
     if brand_norm in label_norm:
         remainder = label_norm.replace(brand_norm, "", 1)
         if remainder in COMMERCE_MODIFIERS or any(mod in remainder for mod in COMMERCE_MODIFIERS):
-            return f"שם המותג משולב בדומיין עם ביטוי מסחרי: {label}"
+            return f"The brand name is combined with a commercial term: {label}"
     return ""
 
 
@@ -104,39 +104,39 @@ def assess_risk(
     matched_fingerprint = next((marker for marker in FINGERPRINTS if marker in combined), "")
     if matched_fingerprint:
         evidence.append(Evidence(
-            "template_fingerprint", "טביעת אצבע של תבנית", 40,
-            f'נמצא הביטוי "{matched_fingerprint}"',
+            "template_fingerprint", "Storefront template fingerprint", 40,
+            f'Detected the phrase "{matched_fingerprint}"',
         ))
 
     matched_secondary = [marker for marker in SECONDARY_MARKERS if marker in combined][:2]
     for marker in matched_secondary:
         evidence.append(Evidence(
-            "secondary_template_marker", "סימן תבנית משני", 10,
-            f'נמצא הביטוי "{marker}"',
+            "secondary_template_marker", "Secondary template marker", 10,
+            f'Detected the phrase "{marker}"',
         ))
 
     if domain_age_days is not None:
         if domain_age_days <= 180:
             evidence.append(Evidence(
-                "young_domain", "דומיין חדש", 25,
-                f"הדומיין נרשם לפני {domain_age_days} ימים",
+                "young_domain", "Newly registered domain", 25,
+                f"The domain was registered {domain_age_days} days ago",
             ))
         elif domain_age_days <= 365:
             evidence.append(Evidence(
-                "recent_domain", "דומיין בן פחות משנה", 15,
-                f"הדומיין נרשם לפני {domain_age_days} ימים",
+                "recent_domain", "Domain registered within the past year", 15,
+                f"The domain was registered {domain_age_days} days ago",
             ))
 
     domain_detail = _brand_domain_signal(brand, url)
     if domain_detail:
         evidence.append(Evidence(
-            "brand_domain_pattern", "דפוס התחזות בשם הדומיין", 15, domain_detail,
+            "brand_domain_pattern", "Brand impersonation domain pattern", 15, domain_detail,
         ))
 
     if final_url and _registrable_domain(url) != _registrable_domain(final_url):
         evidence.append(Evidence(
-            "cross_domain_redirect", "הפניה לדומיין אחר", 10,
-            f"העמוד עבר אל {_registrable_domain(final_url)}",
+            "cross_domain_redirect", "Cross-domain redirect", 10,
+            f"The page redirected to {_registrable_domain(final_url)}",
         ))
 
     score = min(100, sum(item.points for item in evidence))

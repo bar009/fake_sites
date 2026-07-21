@@ -35,15 +35,15 @@ ACTIVE_STATUSES = {"queued", "running"}
 
 def load_csv_rows(payload: bytes) -> list[dict]:
     if len(payload) > 1_000_000:
-        raise ValueError("קובץ CSV גדול מדי; המגבלה היא 1MB")
+        raise ValueError("The CSV file is too large; the limit is 1 MB")
     try:
         text = payload.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise ValueError("קובץ CSV חייב להיות בקידוד UTF-8") from exc
+        raise ValueError("The CSV file must use UTF-8 encoding") from exc
     reader = csv.DictReader(io.StringIO(text))
     fields = {str(field).strip().lower() for field in (reader.fieldnames or [])}
     if "brand" not in fields:
-        raise ValueError("קובץ CSV חייב לכלול עמודת brand")
+        raise ValueError("The CSV file must include a brand column")
     rows = []
     for raw in reader:
         item = {str(key or "").strip().lower(): str(value or "").strip() for key, value in raw.items()}
@@ -56,15 +56,15 @@ def load_csv_rows(payload: bytes) -> list[dict]:
                 "official_domain": item.get("official_domain", "")[:255],
             })
     if not rows:
-        raise ValueError("לא נמצאו מותגים בקובץ")
+        raise ValueError("No brands were found in the file")
     if len(rows) > 2_000:
-        raise ValueError("ניתן להעלות עד 2,000 מותגים בסריקה")
+        raise ValueError("A scan can include up to 2,000 brands")
     return rows
 
 
 def format_money(value) -> str:
     if value in (None, ""):
-        return "לא זמין"
+        return "Not available"
     value = float(value)
     if value >= 1_000_000_000_000:
         return f"${value / 1_000_000_000_000:.2f}T"
@@ -123,7 +123,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
 
     def check_csrf(value: str) -> None:
         if not secrets.compare_digest(value, csrf_token):
-            raise HTTPException(403, "טופס לא תקין")
+            raise HTTPException(403, "Invalid form submission")
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):
@@ -140,7 +140,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         return templates.TemplateResponse(
             request, "error.html",
             context(request, status_code=400,
-                    message="חסרים פרטים בטופס או שאחד הערכים אינו תקין"),
+                    message="Required form details are missing or invalid"),
             status_code=400,
         )
 
@@ -169,7 +169,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     ):
         check_csrf(csrf_token_value)
         if provider not in {"ddgs", "brave"} or not 1 <= top_n <= 10:
-            raise HTTPException(400, "הגדרות הסריקה אינן תקינות")
+            raise HTTPException(400, "The scan settings are invalid")
         try:
             rows = load_csv_rows(await file.read())
         except ValueError as exc:
@@ -189,7 +189,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         check_csrf(csrf_token_value)
         brand = brand.strip()
         if not brand or len(brand) > 200 or provider not in {"ddgs", "brave"} or not 1 <= top_n <= 10:
-            raise HTTPException(400, "פרטי הסריקה אינם תקינים")
+            raise HTTPException(400, "The scan details are invalid")
         scan_id = repository.create_scan(
             kind="brand", targets=[{"brand": brand, "topic": topic[:200]}],
             provider=provider, top_n=top_n, source_name=brand,
@@ -205,7 +205,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         check_csrf(csrf_token_value)
         brand = brand.strip()
         if not brand or len(brand) > 200:
-            raise HTTPException(400, "יש לציין מותג תקין")
+            raise HTTPException(400, "Enter a valid brand name")
         try:
             url = validate_public_url(url)
         except UnsafeUrlError as exc:
@@ -282,7 +282,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
         if not scan:
             raise HTTPException(404)
         if scan["status"] in ACTIVE_STATUSES:
-            raise HTTPException(409, "לא ניתן למחוק סריקה פעילה")
+            raise HTTPException(409, "An active scan cannot be deleted")
         repository.delete_scan(scan_id)
         shutil.rmtree(data_dir / "scans" / str(scan_id), ignore_errors=True)
         return RedirectResponse("/", status_code=303)
@@ -304,7 +304,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     ):
         check_csrf(csrf_token_value)
         if review_status not in REVIEW_STATUSES:
-            raise HTTPException(400, "סטטוס לא תקין")
+            raise HTTPException(400, "Invalid review status")
         repository.update_review(finding_id, review_status, review_note)
         if request.headers.get("HX-Request") == "true":
             finding = repository.get_finding(finding_id)
@@ -312,7 +312,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
                 request, "partials/review_form.html", context(request, finding=finding),
             )
             response.headers["HX-Trigger"] = json.dumps(
-                {"showToast": {"message": "הסקירה נשמרה", "tone": "success"}},
+                {"showToast": {"message": "Review saved", "tone": "success"}},
                 ensure_ascii=False,
             )
             return response
@@ -357,7 +357,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
                 headers={
                     "HX-Refresh": "true",
                     "HX-Trigger": json.dumps(
-                        {"showToast": {"message": "מיפוי החברה עודכן", "tone": "success"}},
+                        {"showToast": {"message": "Company mapping updated", "tone": "success"}},
                         ensure_ascii=False,
                     ),
                 }
@@ -414,16 +414,16 @@ def _html_export(scan: dict, rows: list[dict]) -> str:
         evidence = "".join(
             f"<li>{html.escape(item['label'])}: {item['points']} — {html.escape(item['detail'])}</li>"
             for item in row["evidence"]
-        ) or "<li>לא נמצאו אותות חשד</li>"
+        ) or "<li>No risk signals were detected</li>"
         cards.append(
             f"<article><h2>{html.escape(row['brand'])} — {row['risk_score']}/100</h2>"
             f"<p dir='ltr'>{html.escape(row['url'])}</p><ul>{evidence}</ul></article>"
         )
-    return f"""<!doctype html><html lang='he' dir='rtl'><meta charset='utf-8'>
+    return f"""<!doctype html><html lang='en' dir='ltr'><meta charset='utf-8'>
     <title>Fake Shop Scan {scan['id']}</title><style>
     body{{font-family:Arial;max-width:1000px;margin:auto;padding:32px;background:#f5f7fa}}
     article{{background:white;padding:20px;margin:16px 0;border:1px solid #dfe3e8;border-radius:12px}}
-    </style><h1>סריקה #{scan['id']}</h1>{''.join(cards)}</html>"""
+    </style><h1>Scan #{scan['id']}</h1>{''.join(cards)}</html>"""
 
 
 app = create_app()
