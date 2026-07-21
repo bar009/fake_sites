@@ -1,6 +1,6 @@
 """Search providers for fake-shop fingerprint queries.
 
-Default provider is DuckDuckGo (ddgs, no API key). Brave Search API is
+Default provider is ddgs with DuckDuckGo and Yahoo backends (no API key). Brave Search API is
 available as an alternative when BRAVE_API_KEY is set in .env.
 """
 
@@ -11,11 +11,16 @@ from dataclasses import dataclass
 
 import requests
 
-# The misspelled "Costumers" is deliberate - it's the fingerprint of the
-# fake-shop template being hunted. Add more phrases here as new templates appear.
-QUERY_TEMPLATE = 'site:.shop "What Are The Costumers Say" "{brand}"'
+from fakeshop.brand_identity import canonical_brand_name
+
+# Primary storefront-template fingerprint. Keep this exact phrase quoted so the
+# search engine does not turn it into a broad customer-review query.
+QUERY_TEMPLATE = 'site:.shop "What Our Customers Say" {brand_clause}'
 
 MAX_ATTEMPTS = 3
+# Yahoo currently indexes the exact storefront phrase more consistently. Keep
+# DuckDuckGo as the no-key fallback for brands that Yahoo does not return.
+DDGS_BACKENDS = ("yahoo", "duckduckgo")
 
 
 @dataclass
@@ -26,11 +31,13 @@ class SearchResult:
 
 
 def build_query(brand: str) -> str:
-    return QUERY_TEMPLATE.format(brand=brand)
+    search_name = canonical_brand_name(brand).replace('"', "")
+    brand_clause = f'"{search_name}"'
+    return QUERY_TEMPLATE.format(brand_clause=brand_clause)
 
 
 class DdgsProvider:
-    """DuckDuckGo via the ddgs library. No API key, but rate-limited on
+    """DuckDuckGo with a Yahoo fallback via ddgs. No API key, but rate-limited on
     large batches, so keep the polite delay between queries."""
 
     name = "ddgs"
@@ -47,14 +54,13 @@ class DdgsProvider:
         self._first_call = False
 
         last_error = None
-        for attempt in range(1, MAX_ATTEMPTS + 1):
+        completed_backend = False
+        for backend in DDGS_BACKENDS:
             try:
                 with DDGS() as ddgs:
-                    raw = list(ddgs.text(query, max_results=top))
-                # DDG intermittently returns an empty set for queries that do
-                # have hits - treat empty as retryable until attempts run out.
-                if not raw and attempt < MAX_ATTEMPTS:
-                    time.sleep(8 * attempt + random.uniform(0, 4))
+                    raw = list(ddgs.text(query, max_results=top, backend=backend))
+                completed_backend = True
+                if not raw:
                     continue
                 results = []
                 for r in raw[:top]:
@@ -66,20 +72,21 @@ class DdgsProvider:
                         title=r.get("title", ""),
                         snippet=r.get("body", "") or r.get("snippet", ""),
                     ))
-                return results
+                # Some backends occasionally return placeholder records with
+                # no URL. They are not real hits; continue to the fallback
+                # backend instead of reporting an empty successful search.
+                if results:
+                    return results
             except Exception as e:  # noqa: BLE001 - rate limits surface as generic errors
-                # "No results found" is a real answer (most brands have no fake
-                # site with this template) - one retry to rule out flakiness,
-                # then report it as an empty result, not a failure.
+                # A backend with no hits is not a scan failure. Try the next
+                # no-key backend because their indexes differ substantially.
                 if "no results" in str(e).lower():
-                    if attempt < 2:
-                        time.sleep(6 + random.uniform(0, 4))
-                        continue
-                    return []
+                    completed_backend = True
+                    continue
                 last_error = e
-                if attempt < MAX_ATTEMPTS:
-                    time.sleep(10 * attempt + random.uniform(0, 5))
-        raise RuntimeError(f"DuckDuckGo search failed after {MAX_ATTEMPTS} attempts: {last_error}")
+        if completed_backend:
+            return []
+        raise RuntimeError(f"DDGS search failed across all backends: {last_error}")
 
 
 class BraveProvider:

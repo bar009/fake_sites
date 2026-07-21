@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error {{ status_code }} — Fake Shop Checker{% endblock %}
+{% block content %}
+<div class="empty-panel large">
+  <span class="section-kicker">Error {{ status_code }}</span>
+  <strong>We could not complete the request</strong>
+  <p>{{ message }}</p>
+  <a class="button button-primary" href="/">Back to overview</a>
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 """Fake brand-site checker.
 
-For every brand in the input CSV: search 'site:.shop "What Are The Costumers Say"
+For every brand in the input CSV: search 'site:.shop "What Our Customers Say"
 "<brand>"', open the top N hits in headless Chromium, screenshot each, look up the
 domain registration via RDAP, and write results.xlsx + report.html + results.json
 into a timestamped folder under runs/.
@@ -21,9 +21,9 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 from fakeshop.capture import Capturer
+from fakeshop.engine import ScanEngine
 from fakeshop.report import write_html, write_json, write_xlsx
-from fakeshop.search import build_query, get_provider
-from fakeshop.whois_check import WhoisChecker, domain_of
+from fakeshop.scoring import assess_risk
 
 
 def load_brands(csv_path: Path) -> list[dict]:
@@ -100,8 +100,7 @@ def main() -> None:
         if not brands:
             sys.exit(f"ERROR: brand '{args.brand}' not found in {args.brands_csv}")
 
-    provider = get_provider(args.provider)
-    whois = WhoisChecker()
+    engine = ScanEngine(args.provider)
 
     rows: list[dict] = []
     if args.resume:
@@ -123,7 +122,7 @@ def main() -> None:
     shots_dir = run_dir / "screenshots"
     shots_dir.mkdir(parents=True, exist_ok=True)
     print(f"Run folder: {run_dir}")
-    print(f"{len(brands)} brand(s), top {args.top} results each, provider: {provider.name}\n")
+    print(f"{len(brands)} brand(s), top {args.top} results each, provider: {engine.provider.name}\n")
 
     def flush() -> None:
         write_json(rows, run_dir / "results.json")
@@ -133,11 +132,12 @@ def main() -> None:
     with Capturer() as capturer:
         for i, entry in enumerate(brands, start=1):
             brand, topic = entry["brand"], entry["topic"]
-            query = build_query(brand)
             print(f"[{i}/{len(brands)}] {brand} ... ", end="", flush=True)
 
             try:
-                results = provider.search(query, top=args.top)
+                brand_rows = engine.scan_brand(
+                    brand, top=args.top, screenshot_dir=shots_dir, capturer=capturer,
+                )
             except Exception as e:  # noqa: BLE001 - record and move on
                 print(f"SEARCH FAILED: {e}")
                 rows.append({"brand": brand, "topic": topic, "rank": "", "url": "",
@@ -145,54 +145,30 @@ def main() -> None:
                 flush()
                 continue
 
-            # search engines sneak ad/redirect links (bing.com/aclick, ...) into
-            # results despite the site:.shop operator - keep only .shop domains
-            results = [r for r in results if domain_of(r.url).endswith(".shop")]
-
-            if not results:
+            if not brand_rows:
                 print("no results")
                 rows.append({"brand": brand, "topic": topic, "rank": "", "url": "",
                              "flags": [], "error": "no search results"})
                 flush()
                 continue
 
-            print(f"{len(results)} result(s)")
-            for rank, hit in enumerate(results, start=1):
-                domain = domain_of(hit.url)
-                print(f"    #{rank} {hit.url}")
-
-                info = whois.lookup(hit.url)
-                target_url, note = capture_target(hit.url)
-                shot_path = shots_dir / f"{safe_name(brand)}_{rank}_{safe_name(domain)}.png"
-                cap = capturer.capture(target_url, shot_path)
-
-                root_url = f"https://{domain}/"
-                if cap.error and target_url != root_url:
-                    cap = capturer.capture(root_url, shot_path)
-                    note = (note + "; " if note else "") + "original URL failed; captured site homepage"
-
-                errors = "; ".join(e for e in (info.error, cap.error) if e)
-                if cap.error:
-                    print(f"       capture error: {cap.error}")
-
-                rows.append({
-                    "brand": brand,
-                    "topic": topic,
-                    "rank": rank,
-                    "query": query,
-                    "url": hit.url,
-                    "final_url": cap.final_url,
-                    "page_title": cap.page_title or hit.title,
-                    "domain": domain,
-                    "domain_created": info.created,
-                    "domain_age_days": info.age_days,
-                    "registrar": info.registrar,
-                    "country": info.country,
-                    "flags": list(info.flags),
-                    "note": note,
-                    "screenshot": cap.screenshot,
-                    "error": errors,
-                })
+            print(f"{len(brand_rows)} result(s)")
+            for row in brand_rows:
+                print(f"    #{row['rank']} {row['url']}")
+                assessment = assess_risk(
+                    brand=brand, url=row["url"], final_url=row.get("final_url", ""),
+                    page_text=row.get("page_text", ""),
+                    search_snippet=row.get("search_snippet", ""),
+                    domain_age_days=row.get("domain_age_days"),
+                )
+                row["brand"] = brand
+                row["topic"] = topic
+                row["risk_score"] = assessment["score"]
+                row["risk_level"] = assessment["level"]
+                row["evidence"] = assessment["evidence"]
+                row.pop("page_text", None)
+                row.pop("screenshot_path", None)
+                rows.append(row)
 
             # hours-long batches must survive a crash mid-run
             flush()

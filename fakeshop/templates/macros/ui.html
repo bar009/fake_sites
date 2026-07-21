@@ -1,0 +1,35 @@
+{% macro icon(name, size=18) -%}
+<svg class="icon" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {% if name == 'dashboard' %}<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+  {% elif name == 'scan' %}<path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M7 12h10M12 7v10"/>
+  {% elif name == 'mapping' %}<circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M8 7.5l3 8M16 7.5l-3 8M8 6h8"/>
+  {% elif name == 'alert' %}<path d="M12 3L2.7 20h18.6L12 3z"/><path d="M12 9v4M12 17h.01"/>
+  {% elif name == 'activity' %}<path d="M3 12h4l2-7 4 14 2-7h6"/>
+  {% elif name == 'search' %}<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>
+  {% elif name == 'download' %}<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>
+  {% elif name == 'menu' %}<path d="M4 7h16M4 12h16M4 17h16"/>
+  {% elif name == 'close' %}<path d="M5 5l14 14M19 5L5 19"/>
+  {% elif name == 'copy' %}<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/>
+  {% elif name == 'chevron' %}<path d="M9 18l6-6-6-6"/>
+  {% elif name == 'external' %}<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/>
+  {% elif name == 'shield' %}<path d="M12 3l8 3v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6l8-3z"/><path d="M9 12l2 2 4-4"/>
+  {% endif %}
+</svg>
+{%- endmacro %}
+
+{% macro status_badge(status) -%}
+{% set labels = {'queued':'Queued','running':'Running','completed':'Completed','cancelled':'Cancelled','failed':'Failed','interrupted':'Interrupted','pending':'Pending','no_results':'No results','unreviewed':'Unreviewed','confirmed':'Confirmed suspicious','false_positive':'False positive','investigate':'Needs investigation','auto_confirmed':'Auto-confirmed','needs_review':'Needs review','no_match':'No match','unavailable':'Unavailable'} %}
+<span class="badge badge-{{ status }}"><span class="badge-dot"></span>{{ labels.get(status, status) }}</span>
+{%- endmacro %}
+
+{% macro risk_badge(level, score) -%}
+{% set labels = {'high':'High','medium':'Medium','low':'Low'} %}
+<span class="risk-badge risk-{{ level }}"><strong>{{ score }}</strong><small>{{ labels.get(level, level) }}</small></span>
+{%- endmacro %}
+
+{% macro kpi(label, value, note, icon_name, tone='blue') -%}
+<article class="kpi-card kpi-{{ tone }}">
+  <span class="kpi-icon">{{ icon(icon_name, 19) }}</span>
+  <div><span>{{ label }}</span><strong>{{ value }}</strong><small>{{ note }}</small></div>
+</article>
+{%- endmacro %}

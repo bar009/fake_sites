@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon, kpi %}
+{% block title %}Company Mappings — Fake Shop Checker{% endblock %}
+{% block content %}
+<header class="page-header"><div><span class="section-kicker">Company intelligence</span><h1>Company mappings</h1><p>Confirming a match immediately updates the priority score for every historical finding associated with the brand.</p></div></header>
+<section class="kpi-grid mapping-kpis">
+  {{ kpi('All brands', mapping_stats.total, 'Mappings created', 'mapping', 'blue') }}
+  {{ kpi('Confirmed', mapping_stats.confirmed, 'Manual or automatic', 'shield', 'cyan') }}
+  {{ kpi('Needs review', mapping_stats.needs_review, 'Ambiguous matches', 'alert', 'amber') }}
+  {{ kpi('No match', mapping_stats.no_match, 'Private or unavailable', 'search', 'gray') }}
+</section>
+<section class="dashboard-section">
+  <form class="results-toolbar" method="get" action="/mappings" hx-get="/mappings/list" hx-target="#mappings-results" hx-push-url="/mappings" hx-trigger="change, submit">
+    <label class="search-field"><span class="sr-only">Search</span>{{ icon('search', 17) }}<input name="q" value="{{ q_filter }}" placeholder="Search brand, company, or ticker"></label>
+    <label><span class="sr-only">Status</span><select name="status"><option value="">All statuses</option><option value="needs_review" {% if status_filter=='needs_review' %}selected{% endif %}>Needs review</option><option value="confirmed" {% if status_filter=='confirmed' %}selected{% endif %}>Confirmed</option><option value="auto_confirmed" {% if status_filter=='auto_confirmed' %}selected{% endif %}>Auto-confirmed</option><option value="no_match" {% if status_filter=='no_match' %}selected{% endif %}>No match</option><option value="unavailable" {% if status_filter=='unavailable' %}selected{% endif %}>Unavailable</option></select></label>
+    <button class="button button-quiet" type="submit">Update</button>
+  </form>
+  {% include "partials/mappings_list.html" %}
+</section>
+{% endblock %}

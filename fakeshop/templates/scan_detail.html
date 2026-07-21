@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon, status_badge %}
+{% block title %}Scan #{{ scan.id }} — Fake Shop Checker{% endblock %}
+{% block content %}
+<header class="page-header scan-page-header">
+  <div><a class="back-link" href="/">← Back to overview</a><span class="section-kicker">Investigation #{{ scan.id }}</span><h1>{{ scan.source_name or 'Scan' }}</h1><p>{{ scan.created_at }} · {{ scan.kind }} · {{ scan.provider }} provider</p></div>
+  <div class="export-actions"><span>Export raw evidence</span><div><a class="button button-quiet" href="/scans/{{ scan.id }}/export/json">JSON</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/xlsx">Excel</a><a class="button button-quiet" href="/scans/{{ scan.id }}/export/html">HTML</a></div></div>
+</header>
+{% include "partials/scan_status.html" %}
+
+<section class="dashboard-section targets-section">
+  <div class="section-heading"><div><span class="section-kicker">Target health</span><h2>Scan targets</h2></div><small>{{ targets|length }} target{% if targets|length != 1 %}s{% endif %} · {{ page_count }} evidence page{% if page_count != 1 %}s{% endif %}</small></div>
+  <div class="target-table" role="table" aria-label="Scan target status">
+    <div class="target-head" role="row"><span>Brand</span><span>Status</span><span>Domains</span><span>Pages</span><span>Error</span></div>
+    {% for target in targets %}<div class="target-row" role="row"><strong>{{ target.brand }}{% if target.attempt_count > 1 %}<small>{{ target.attempt_count }} attempts</small>{% endif %}</strong><span>{{ status_badge(target.display_status) }}</span><span>{{ target.domain_count }}</span><span>{{ target.page_count }}</span><span class="target-error">{{ target.error or '—' }}</span></div>{% endfor %}
+  </div>
+</section>
+
+<section class="dashboard-section findings-section">
+  <div class="section-heading"><div><span class="section-kicker">Evidence queue</span><h2>Findings by domain</h2></div><small>Pages from the same registered domain are grouped together</small></div>
+  <form class="results-toolbar" method="get" action="/scans/{{ scan.id }}" hx-get="/scans/{{ scan.id }}/findings" hx-target="#findings-results" hx-push-url="/scans/{{ scan.id }}" hx-trigger="change, submit">
+    <label class="search-field"><span class="sr-only">Search</span>{{ icon('search', 17) }}<input name="q" value="{{ q_filter }}" placeholder="Search domain or brand"></label>
+    <label><span class="sr-only">Risk</span><select name="risk"><option value="">All risk levels</option><option value="high" {% if risk_filter=='high' %}selected{% endif %}>High</option><option value="medium" {% if risk_filter=='medium' %}selected{% endif %}>Medium</option><option value="low" {% if risk_filter=='low' %}selected{% endif %}>Low</option></select></label>
+    <label><span class="sr-only">Review</span><select name="review"><option value="">All review statuses</option><option value="unreviewed" {% if review_filter=='unreviewed' %}selected{% endif %}>Unreviewed</option><option value="confirmed" {% if review_filter=='confirmed' %}selected{% endif %}>Confirmed suspicious</option><option value="false_positive" {% if review_filter=='false_positive' %}selected{% endif %}>False positive</option><option value="investigate" {% if review_filter=='investigate' %}selected{% endif %}>Needs investigation</option></select></label>
+    <label><span class="sr-only">Sort</span><select name="sort"><option value="priority" {% if sort_filter=='priority' %}selected{% endif %}>Priority</option><option value="risk" {% if sort_filter=='risk' %}selected{% endif %}>Risk</option><option value="date" {% if sort_filter=='date' %}selected{% endif %}>Date</option><option value="domain" {% if sort_filter=='domain' %}selected{% endif %}>Domain</option></select></label>
+    <button class="button button-quiet" type="submit">Update</button>
+  </form>
+  {% include "partials/findings_table.html" %}
+</section>
+{% if scan.status not in active_statuses %}<form class="danger-zone" method="post" action="/scans/{{ scan.id }}/delete" data-confirm="Delete this scan and its screenshots?"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="button button-danger" type="submit">Delete scan</button></form>{% endif %}
+{% endblock %}
