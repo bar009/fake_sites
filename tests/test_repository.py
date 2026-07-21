@@ -116,6 +116,46 @@ def test_dashboard_counts_domains_companies_and_scan_history(tmp_path: Path):
     assert len(repository.list_all_finding_groups(review="open")) == 3
 
 
+def test_company_investigations_are_alphabetical_and_share_priority(tmp_path: Path):
+    repository = Repository(tmp_path / "app.db")
+    scan_id = repository.create_scan(
+        kind="csv", provider="ddgs", top_n=2, source_name="brands.csv",
+        targets=[{"brand": "Shop Brand"}, {"brand": "Outlet Brand"}, {"brand": "Beta Corp"}],
+    )
+    targets = repository.pending_targets(scan_id)
+    finding_ids = []
+    for target, score, domain in zip(
+        targets, (60, 90, 45),
+        ("shop-brand.shop", "outlet-brand.shop", "beta-corp.shop"),
+    ):
+        finding_ids.append(repository.add_finding(
+            scan_id=scan_id, brand_id=target["brand_id"],
+            row={"url": f"https://{domain}", "domain": domain,
+                 "registrable_domain": domain},
+            assessment={
+                "score": score,
+                "level": "high" if score >= 60 else "medium",
+                "evidence": [],
+            },
+            priority=score,
+        ))
+    for target in targets[:2]:
+        repository.save_mapping(
+            target["brand_id"], parent_company="Acme Group", status="confirmed",
+            market_cap_usd=None,
+        )
+
+    companies = repository.list_company_investigations()
+    assert [item["company_name"] for item in companies] == ["Acme Group", "Beta Corp"]
+    assert companies[0]["brands"] == ["Outlet Brand", "Shop Brand"]
+    assert companies[0]["priority_score"] == 90
+    assert {item["company_priority_score"] for item in companies[0]["domains"]} == {90}
+
+    repository.update_review(finding_ids[1], "false_positive", "Not an impersonation")
+    companies = repository.list_company_investigations()
+    assert companies[0]["priority_score"] == 60
+
+
 def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: Path):
     db_path = tmp_path / "app.db"
     repository = Repository(db_path)

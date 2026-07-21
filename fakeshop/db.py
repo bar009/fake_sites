@@ -579,7 +579,9 @@ class Repository:
     def list_finding_groups(self, scan_id: int, risk: str = "", review: str = "",
                             q: str = "", sort: str = "priority") -> list[dict]:
         rows = self.list_findings(scan_id, risk=risk, review=review, q=q, sort=sort)
-        return self._group_finding_rows(rows, sort)
+        result = self._group_finding_rows(rows, sort)
+        self._attach_company_priorities(result)
+        return result
 
     def list_all_findings(self, risk: str = "", review: str = "", q: str = "",
                           sort: str = "priority") -> list[dict]:
@@ -623,7 +625,105 @@ class Repository:
     def list_all_finding_groups(self, risk: str = "", review: str = "", q: str = "",
                                 sort: str = "priority") -> list[dict]:
         rows = self.list_all_findings(risk=risk, review=review, q=q, sort=sort)
-        return self._group_finding_rows(rows, sort)
+        result = self._group_finding_rows(rows, sort)
+        self._attach_company_priorities(result)
+        return result
+
+    @staticmethod
+    def _company_key(row: dict) -> tuple:
+        parent = (row.get("parent_company") or "").strip()
+        if parent and row.get("mapping_status") in {"confirmed", "auto_confirmed"}:
+            return "company", parent.casefold()
+        return "brand", int(row["brand_id"])
+
+    def company_priority_by_brand(self) -> dict[int, int]:
+        grouped: dict[tuple, dict] = {}
+        for row in self.list_all_findings():
+            if row["review_status"] == "false_positive":
+                continue
+            item = grouped.setdefault(
+                self._company_key(row), {"brand_ids": set(), "priority": 0},
+            )
+            item["brand_ids"].add(int(row["brand_id"]))
+            item["priority"] = max(item["priority"], int(row["priority_score"]))
+        return {
+            brand_id: item["priority"]
+            for item in grouped.values()
+            for brand_id in item["brand_ids"]
+        }
+
+    def _attach_company_priorities(self, rows: list[dict]) -> None:
+        priorities = self.company_priority_by_brand()
+        for row in rows:
+            row["company_priority_score"] = priorities.get(
+                int(row["brand_id"]), 0,
+            )
+
+    def list_company_investigations(
+        self, risk: str = "", review: str = "", q: str = "", sort: str = "company",
+    ) -> list[dict]:
+        all_domains = self.list_all_finding_groups(sort="priority")
+        visible_domains = self.list_all_finding_groups(
+            risk=risk, review=review, q=q, sort="priority",
+        )
+        all_by_company: dict[tuple, list[dict]] = {}
+        visible_by_company: dict[tuple, list[dict]] = {}
+        for row in all_domains:
+            all_by_company.setdefault(self._company_key(row), []).append(row)
+        for row in visible_domains:
+            visible_by_company.setdefault(self._company_key(row), []).append(row)
+
+        companies = []
+        for key, domains in visible_by_company.items():
+            complete_domains = all_by_company[key]
+            representative = max(
+                complete_domains,
+                key=lambda item: (item["company_priority_score"], item["risk_score"], item["id"]),
+            )
+            active_domains = [
+                item for item in complete_domains if item["review_status"] != "false_positive"
+            ] or complete_domains
+            highest_risk = max(active_domains, key=lambda item: (item["risk_score"], item["id"]))
+            company_name = (
+                representative.get("parent_company")
+                if key[0] == "company"
+                else representative["brand"]
+            )
+            companies.append({
+                "anchor_id": min(int(item["brand_id"]) for item in complete_domains),
+                "company_name": company_name,
+                "brands": sorted({item["brand"] for item in complete_domains}, key=str.casefold),
+                "ticker": representative.get("ticker") or "",
+                "market_cap_usd": representative.get("market_cap_usd"),
+                "priority_score": max(item["company_priority_score"] for item in complete_domains),
+                "risk_score": highest_risk["risk_score"],
+                "risk_level": highest_risk["risk_level"],
+                "domain_count": len(complete_domains),
+                "visible_domain_count": len(domains),
+                "page_count": sum(item["page_count"] for item in complete_domains),
+                "high_domain_count": sum(item["risk_level"] == "high" for item in active_domains),
+                "awaiting_review_count": sum(
+                    item["review_status"] in {"unreviewed", "investigate"}
+                    for item in complete_domains
+                ),
+                "latest": max(item["created_at"] for item in complete_domains),
+                "domains": sorted(
+                    domains,
+                    key=lambda item: (
+                        -item["risk_score"],
+                        (item.get("registrable_domain") or item["domain"]).casefold(),
+                    ),
+                ),
+            })
+
+        sorters = {
+            "company": lambda item: (item["company_name"].casefold(), item["anchor_id"]),
+            "priority": lambda item: (-item["priority_score"], item["company_name"].casefold()),
+            "risk": lambda item: (-item["risk_score"], item["company_name"].casefold()),
+            "date": lambda item: (item["latest"], item["company_name"].casefold()),
+        }
+        companies.sort(key=sorters.get(sort, sorters["company"]), reverse=sort == "date")
+        return companies
 
     @staticmethod
     def _group_finding_rows(rows: list[dict], sort: str) -> list[dict]:
@@ -661,7 +761,12 @@ class Repository:
                    LEFT JOIN company_mappings m ON m.brand_id=b.id
                    WHERE f.id=?""", (finding_id,),
             ).fetchone()
-            return self._decode_finding(dict(row)) if row else None
+            finding = self._decode_finding(dict(row)) if row else None
+        if finding:
+            finding["company_priority_score"] = self.company_priority_by_brand().get(
+                int(finding["brand_id"]), int(finding["priority_score"]),
+            )
+        return finding
 
     def related_findings(self, finding_id: int) -> list[dict]:
         finding = self.get_finding(finding_id)
@@ -808,11 +913,8 @@ class Repository:
     def active_scans(self, limit: int = 5) -> list[dict]:
         return [scan for scan in self.list_scans(limit=50) if scan["status"] in {"queued", "running"}][:limit]
 
-    def urgent_findings(self, limit: int = 5) -> list[dict]:
-        rows = self.list_all_finding_groups(sort="priority")
-        rows = [row for row in rows if row["review_status"] != "false_positive"]
-        rows.sort(key=lambda item: (-item["priority_score"], -item["risk_score"], -item["id"]))
-        return rows[:limit]
+    def urgent_companies(self, limit: int = 5) -> list[dict]:
+        return self.list_company_investigations(review="open", sort="priority")[:limit]
 
     def dashboard_stats(self) -> dict:
         with self.connect() as connection:

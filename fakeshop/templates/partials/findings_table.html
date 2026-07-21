@@ -4,7 +4,7 @@
   {% if findings %}
   <div class="finding-table" role="table" aria-label="Scan findings">
     <div class="finding-table-head" role="row">
-      <span>Risk</span><span>Website case</span><span>Age</span><span>Indicators</span><span>Priority</span><span>Review</span><span>Open</span>
+      <span>Risk</span><span>Website case</span><span>Age</span><span>Indicators</span><span>Company priority</span><span>Review</span><span>Open</span>
     </div>
     {% for finding in findings %}
     <a class="finding-row" href="/findings/{{ finding.id }}" role="row" aria-label="Open investigation for {{ finding.registrable_domain or finding.domain }}">
@@ -15,7 +15,7 @@
       </span>
       <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</span>
       <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>signals</small></span>
-      <span class="priority-score">{{ finding.priority_score }}</span>
+      <span class="priority-score" title="Priority for {{ finding.parent_company or finding.brand }}">{{ finding.company_priority_score }}</span>
       <span>{{ status_badge(finding.review_status) }}</span>
       <span class="row-arrow">{{ icon('chevron', 17) }}<span class="sr-only">Open case</span></span>
     </a>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fake Shop Checker">
+  <defs>
+    <linearGradient id="g" x1="8" y1="7" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <path d="M32 13 48 19v10c0 10.2-6.4 17.4-16 21.5C22.4 46.4 16 39.2 16 29V19l16-6Z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="30" cy="29" r="7" fill="none" stroke="#fff" stroke-width="4"/>
+  <path d="m35.5 34.5 6 6" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+</svg>

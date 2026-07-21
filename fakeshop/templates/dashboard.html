@@ -32,19 +32,19 @@
 
 <div class="dashboard-grid">
   <section class="dashboard-section urgent-section">
-    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Priority investigations</h2></div><a href="/findings?sort=priority">View all →</a></div>
-    {% if urgent_findings %}
+    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Priority companies</h2></div><a href="/findings?sort=priority">View all →</a></div>
+    {% if urgent_companies %}
     <div class="urgent-list">
-      {% for finding in urgent_findings %}
-      <a class="urgent-row" href="/findings/{{ finding.id }}">
-        {{ risk_badge(finding.risk_level, finding.risk_score) }}
-        <span class="urgent-identity"><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · Priority {{ finding.priority_score }}</small></span>
-        {{ status_badge(finding.review_status) }}
+      {% for company in urgent_companies %}
+      <a class="urgent-row" href="/findings#company-{{ company.anchor_id }}">
+        {{ risk_badge(company.risk_level, company.risk_score) }}
+        <span class="urgent-identity"><strong>{{ company.company_name }}</strong><small>Company priority {{ company.priority_score }} · {{ company.domain_count }} domain{% if company.domain_count != 1 %}s{% endif %}</small></span>
+        <span class="badge badge-needs_review"><span class="badge-dot"></span>{{ company.awaiting_review_count }} open</span>
         {{ icon('chevron', 17) }}
       </a>
       {% endfor %}
     </div>
-    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>No urgent findings</strong><p>High-risk findings will appear here.</p></div>{% endif %}
+    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>No companies awaiting review</strong><p>Companies with open investigation cases will appear here.</p></div>{% endif %}
   </section>
 
   <section class="dashboard-section recent-section" id="scan-history">
