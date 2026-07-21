@@ -1,0 +1,17 @@
+{% from "macros/ui.html" import icon %}
+<div class="outreach-action-slot">
+  {% if company.on_outreach_list %}
+  <form method="post" action="/outreach/remove" hx-post="/outreach/remove" hx-target="closest .outreach-action-slot" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="company_key" value="{{ company.company_key }}">
+    <input type="hidden" name="return_to" value="/findings">
+    <button class="button outreach-button is-saved" type="submit" title="Remove from the outreach list">{{ icon('shield', 15) }} <span>Saved for outreach</span></button>
+  </form>
+  {% else %}
+  <form method="post" action="/outreach/add" hx-post="/outreach/add" hx-target="closest .outreach-action-slot" hx-swap="outerHTML">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="company_key" value="{{ company.company_key }}">
+    <button class="button outreach-button" type="submit" title="Add this company to the contact list">{{ icon('alert', 15) }} <span>Add to outreach</span></button>
+  </form>
+  {% endif %}
+</div>

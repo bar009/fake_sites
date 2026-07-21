@@ -77,6 +77,10 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
              "detail": "Phrase found", "points": 40},
         ]}, priority=80,
     )
+    repository.save_mapping(
+        target["brand_id"], parent_company="Example", ticker="EXM",
+        status="confirmed", market_cap_usd=12_500_000_000,
+    )
     with TestClient(app) as client:
         dashboard = client.get("/")
         assert "/static/vendor/htmx.min.js" in dashboard.text
@@ -92,6 +96,10 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert investigations.status_code == 200
         assert "Priority belongs to the company; risk belongs to the website" in investigations.text
         assert "Company priority" in investigations.text
+        assert "Market cap $12.5B" in investigations.text
+        assert 'data-company-toggle aria-expanded="false"' in investigations.text
+        assert 'class="company-detail-panel"' in investigations.text
+        assert "Add to outreach" in investigations.text
         assert "<p>Example</p>" not in investigations.text
         assert "Example · 1 captured page" not in investigations.text
         assert f'href="/findings/{finding_id}"' in investigations.text
@@ -99,6 +107,29 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert f'src="/findings/{finding_id}/screenshot"' in investigations.text
         global_partial = client.get("/findings/list?risk=low", headers={"HX-Request": "true"})
         assert "No matching companies" in global_partial.text
+        company_partial = client.get("/findings/list", headers={"HX-Request": "true"})
+        assert "Review</span>" not in company_partial.text
+
+        company = repository.list_company_investigations()[0]
+        added = client.post(
+            "/outreach/add",
+            data={"csrf_token": csrf_from(investigations), "company_key": company["company_key"]},
+            headers={"HX-Request": "true"},
+        )
+        assert added.status_code == 200
+        assert added.headers["HX-Refresh"] == "true"
+        assert repository.outreach_count() == 1
+        outreach = client.get("/outreach")
+        assert "Example" in outreach.text
+        assert "$12.5B" in outreach.text
+        removed = client.post(
+            "/outreach/remove",
+            data={"csrf_token": csrf_from(outreach), "company_key": company["company_key"],
+                  "return_to": "/outreach"},
+            follow_redirects=False,
+        )
+        assert removed.status_code == 303
+        assert repository.outreach_count() == 0
         filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
         assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
         partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})

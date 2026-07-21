@@ -117,6 +117,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
             "request": request,
             "csrf_token": csrf_token,
             "finance_status": repository.finance_status(),
+            "outreach_count": repository.outreach_count(),
             "current_path": request.url.path,
             **values,
         }
@@ -311,6 +312,59 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
             request, "partials/company_investigations.html",
             context(request, companies=companies),
         )
+
+    def company_for_key(company_key: str) -> dict:
+        company = next(
+            (
+                item for item in repository.list_company_investigations(sort="company")
+                if item["company_key"] == company_key
+            ),
+            None,
+        )
+        if not company:
+            raise HTTPException(404, "Company investigation not found")
+        return company
+
+    @app.get("/outreach", response_class=HTMLResponse)
+    def outreach(request: Request):
+        return templates.TemplateResponse(
+            request, "outreach.html",
+            context(request, outreach_companies=repository.list_outreach_companies()),
+        )
+
+    @app.post("/outreach/add")
+    def add_outreach(
+        request: Request, company_key: str = Form(...),
+        csrf_token_value: str = Form(..., alias="csrf_token"),
+    ):
+        check_csrf(csrf_token_value)
+        company = company_for_key(company_key)
+        repository.add_company_outreach(company)
+        if request.headers.get("HX-Request") == "true":
+            return Response(headers={
+                "HX-Refresh": "true",
+                "HX-Trigger": json.dumps(
+                    {"showToast": {"message": "Company added to the outreach list", "tone": "success"}},
+                ),
+            })
+        return RedirectResponse("/findings", status_code=303)
+
+    @app.post("/outreach/remove")
+    def remove_outreach(
+        request: Request, company_key: str = Form(...), return_to: str = Form("/outreach"),
+        csrf_token_value: str = Form(..., alias="csrf_token"),
+    ):
+        check_csrf(csrf_token_value)
+        repository.remove_company_outreach(company_key)
+        if request.headers.get("HX-Request") == "true":
+            return Response(headers={
+                "HX-Refresh": "true",
+                "HX-Trigger": json.dumps(
+                    {"showToast": {"message": "Company removed from the outreach list", "tone": "success"}},
+                ),
+            })
+        safe_return = return_to if return_to in {"/outreach", "/findings"} else "/outreach"
+        return RedirectResponse(safe_return, status_code=303)
 
     @app.get("/findings/{finding_id}", response_class=HTMLResponse)
     def finding_detail(request: Request, finding_id: int):

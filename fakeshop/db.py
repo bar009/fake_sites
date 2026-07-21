@@ -13,7 +13,7 @@ from fakeshop.brand_identity import brand_key, canonical_brand_name
 from fakeshop.whois_check import domain_of, registrable_domain
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def utc_now() -> str:
@@ -99,8 +99,17 @@ CREATE TABLE IF NOT EXISTS findings (
     review_note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS company_outreach (
+    company_key TEXT PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    brand_ids_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS scan_targets_scan_idx ON scan_targets(scan_id, status);
 CREATE INDEX IF NOT EXISTS findings_scan_idx ON findings(scan_id, priority_score DESC);
+CREATE INDEX IF NOT EXISTS company_outreach_status_idx ON company_outreach(status, created_at DESC);
 """
 
 
@@ -636,6 +645,10 @@ class Repository:
             return "company", parent.casefold()
         return "brand", int(row["brand_id"])
 
+    @staticmethod
+    def _company_key_text(key: tuple) -> str:
+        return f"{key[0]}:{key[1]}"
+
     def company_priority_by_brand(self) -> dict[int, int]:
         grouped: dict[tuple, dict] = {}
         for row in self.list_all_findings():
@@ -673,6 +686,7 @@ class Repository:
         for row in visible_domains:
             visible_by_company.setdefault(self._company_key(row), []).append(row)
 
+        outreach_keys = self.outreach_keys()
         companies = []
         for key, domains in visible_by_company.items():
             complete_domains = all_by_company[key]
@@ -690,6 +704,7 @@ class Repository:
                 else representative["brand"]
             )
             companies.append({
+                "company_key": self._company_key_text(key),
                 "anchor_id": min(int(item["brand_id"]) for item in complete_domains),
                 "company_name": company_name,
                 "brands": sorted({item["brand"] for item in complete_domains}, key=str.casefold),
@@ -707,6 +722,7 @@ class Repository:
                     for item in complete_domains
                 ),
                 "latest": max(item["created_at"] for item in complete_domains),
+                "on_outreach_list": self._company_key_text(key) in outreach_keys,
                 "domains": sorted(
                     domains,
                     key=lambda item: (
@@ -724,6 +740,56 @@ class Repository:
         }
         companies.sort(key=sorters.get(sort, sorters["company"]), reverse=sort == "date")
         return companies
+
+    def add_company_outreach(self, company: dict) -> None:
+        now = utc_now()
+        brand_ids = sorted({int(item["brand_id"]) for item in company["domains"]})
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO company_outreach(
+                       company_key, company_name, brand_ids_json, status, created_at, updated_at
+                   ) VALUES (?,?,?,'pending',?,?)
+                   ON CONFLICT(company_key) DO UPDATE SET
+                       company_name=excluded.company_name,
+                       brand_ids_json=excluded.brand_ids_json,
+                       status='pending',
+                       updated_at=excluded.updated_at""",
+                (
+                    company["company_key"], company["company_name"],
+                    json.dumps(brand_ids), now, now,
+                ),
+            )
+
+    def remove_company_outreach(self, company_key: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM company_outreach WHERE company_key=?", (company_key,),
+            )
+
+    def outreach_keys(self) -> set[str]:
+        with self.connect() as connection:
+            return {
+                row["company_key"]
+                for row in connection.execute("SELECT company_key FROM company_outreach")
+            }
+
+    def outreach_count(self) -> int:
+        with self.connect() as connection:
+            return int(connection.execute("SELECT COUNT(*) FROM company_outreach").fetchone()[0])
+
+    def list_outreach_companies(self) -> list[dict]:
+        current = {
+            company["company_key"]: company
+            for company in self.list_company_investigations(sort="company")
+        }
+        with self.connect() as connection:
+            rows = [dict(row) for row in connection.execute(
+                "SELECT * FROM company_outreach ORDER BY company_name COLLATE NOCASE"
+            ).fetchall()]
+        for row in rows:
+            row["brand_ids"] = json.loads(row.pop("brand_ids_json") or "[]")
+            row["company"] = current.get(row["company_key"])
+        return rows
 
     @staticmethod
     def _group_finding_rows(rows: list[dict], sort: str) -> list[dict]:

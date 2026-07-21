@@ -156,6 +156,32 @@ def test_company_investigations_are_alphabetical_and_share_priority(tmp_path: Pa
     assert companies[0]["priority_score"] == 60
 
 
+def test_company_outreach_list_is_persistent(tmp_path: Path):
+    db_path = tmp_path / "app.db"
+    repository = Repository(db_path)
+    scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Example",
+        targets=[{"brand": "Example"}],
+    )
+    target = repository.pending_targets(scan_id)[0]
+    repository.add_finding(
+        scan_id=scan_id, brand_id=target["brand_id"],
+        row={"url": "https://example-sale.shop", "domain": "example-sale.shop",
+             "registrable_domain": "example-sale.shop"},
+        assessment={"score": 80, "level": "high", "evidence": []}, priority=80,
+    )
+    company = repository.list_company_investigations()[0]
+    repository.add_company_outreach(company)
+
+    reopened = Repository(db_path)
+    assert reopened.outreach_count() == 1
+    assert reopened.list_company_investigations()[0]["on_outreach_list"] is True
+    assert reopened.list_outreach_companies()[0]["company_name"] == "Example"
+
+    reopened.remove_company_outreach(company["company_key"])
+    assert reopened.outreach_count() == 0
+
+
 def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: Path):
     db_path = tmp_path / "app.db"
     repository = Repository(db_path)
@@ -191,7 +217,7 @@ def test_migration_merges_duckcamp_aliases_without_losing_references(tmp_path: P
         assert connection.execute("SELECT brand_id FROM scan_targets WHERE id=?", (target_id,)).fetchone()[0] == first
         assert connection.execute("SELECT brand_id FROM findings WHERE id=?", (finding_id,)).fetchone()[0] == first
         assert connection.execute("SELECT status FROM company_mappings WHERE brand_id=?", (first,)).fetchone()[0] == "confirmed"
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
     assert list((tmp_path / "backups").glob("app-v1-*.db"))
 
 
@@ -228,5 +254,5 @@ def test_v3_migration_translates_system_evidence_but_preserves_analyst_text(tmp_
     assert finding["evidence"][1]["label"] == "טקסט היסטורי"
     assert finding["review_note"] == "הערת אנליסט נשמרת"
     with migrated.connect() as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 5
     assert list((tmp_path / "backups").glob("app-v2-*.db"))
