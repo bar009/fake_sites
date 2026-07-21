@@ -22,6 +22,18 @@ def test_missing_information_does_not_add_risk():
     assert result == {"score": 0, "level": "low", "evidence": []}
 
 
+def test_new_customer_phrase_is_primary_fingerprint():
+    result = assess_risk(
+        brand="Duck Camp",
+        url="https://duckcampstore.shop",
+        page_text="What Our Customer Say",
+    )
+    assert result["score"] == 55
+    assert {item["code"] for item in result["evidence"]} == {
+        "template_fingerprint", "brand_domain_pattern",
+    }
+
+
 def test_business_impact_and_priority_are_separate():
     assert impact_score(1_000_000_000) == 25
     assert impact_score(5_000_000_000) == 50

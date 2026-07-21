@@ -91,7 +91,7 @@ Lego,toys,,,
 
 ## Next steps
 
-- מחקר חתימות חיפוש נוספות מעבר ל־`What Are The Costumers Say`.
+- מחקר חתימות חיפוש נוספות מעבר ל־`What Our Customer Say`.
 - הרחבה מבוקרת ל־`.store`, `.online`, `.site` וסיומות נוספות.
 - Certificate Transparency, דומיינים דומים, passive DNS ומאגרי abuse.
 - ניטור מתוזמן, השוואה בין ריצות והתראות.

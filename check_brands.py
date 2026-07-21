@@ -1,6 +1,6 @@
 """Fake brand-site checker.
 
-For every brand in the input CSV: search 'site:.shop "What Are The Costumers Say"
+For every brand in the input CSV: search 'site:.shop "What Our Customer Say"
 "<brand>"', open the top N hits in headless Chromium, screenshot each, look up the
 domain registration via RDAP, and write results.xlsx + report.html + results.json
 into a timestamped folder under runs/.

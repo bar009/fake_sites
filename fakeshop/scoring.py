@@ -7,7 +7,12 @@ from dataclasses import dataclass, asdict
 from urllib.parse import urlparse
 
 
-FINGERPRINT = "what are the costumers say"
+FINGERPRINTS = (
+    "what our customer say",
+    "what our customers say",
+    # Retain the earlier typo-based signature for previously discovered sites.
+    "what are the costumers say",
+)
 SECONDARY_MARKERS = (
     "what are our costumers saying",
     "costumer reviews",
@@ -96,10 +101,11 @@ def assess_risk(
     evidence: list[Evidence] = []
     combined = f"{page_text}\n{search_snippet}".lower()
 
-    if FINGERPRINT in combined:
+    matched_fingerprint = next((marker for marker in FINGERPRINTS if marker in combined), "")
+    if matched_fingerprint:
         evidence.append(Evidence(
             "template_fingerprint", "טביעת אצבע של תבנית", 40,
-            'נמצא הביטוי "What Are The Costumers Say"',
+            f'נמצא הביטוי "{matched_fingerprint}"',
         ))
 
     matched_secondary = [marker for marker in SECONDARY_MARKERS if marker in combined][:2]
