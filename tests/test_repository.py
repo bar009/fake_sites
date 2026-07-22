@@ -147,6 +147,7 @@ def test_company_investigations_are_alphabetical_and_share_priority(tmp_path: Pa
 
     companies = repository.list_company_investigations()
     assert [item["company_name"] for item in companies] == ["Acme Group", "Beta Corp"]
+    assert [item["directory_letter"] for item in companies] == ["A", "B"]
     assert companies[0]["brands"] == ["Outlet Brand", "Shop Brand"]
     assert companies[0]["priority_score"] == 90
     assert {item["company_priority_score"] for item in companies[0]["domains"]} == {90}

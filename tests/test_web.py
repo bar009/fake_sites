@@ -54,7 +54,12 @@ def test_csv_upload_and_url_validation(monkeypatch, tmp_path: Path):
         assert direct.status_code == 303
 
 
-def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
+def test_local_hypermedia_assets_and_filter_fallback(monkeypatch, tmp_path: Path):
+    logo_png = b"\x89PNG\r\n\x1a\ncompany-logo"
+    monkeypatch.setattr(
+        web.CompanyLogoCache, "get",
+        lambda self, domain, company_name="": (logo_png, "image/png"),
+    )
     app = web.create_app(tmp_path, start_worker=False)
     repository = app.state.repository
     scan_id = repository.create_scan(
@@ -75,11 +80,24 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assessment={"score": 80, "level": "high", "evidence": [
             {"code": "template_phrase", "label": "Storefront template fingerprint",
              "detail": "Phrase found", "points": 40},
+            {"code": "young_domain", "label": "Newly registered domain",
+             "detail": "The domain was registered 12 days ago", "points": 25},
         ]}, priority=80,
     )
     repository.save_mapping(
         target["brand_id"], parent_company="Example", ticker="EXM",
         status="confirmed", market_cap_usd=12_500_000_000,
+    )
+    echo_scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Echo",
+        targets=[{"brand": "Echo", "official_domain": "echo.example"}],
+    )
+    echo_target = repository.pending_targets(echo_scan_id)[0]
+    repository.add_finding(
+        scan_id=echo_scan_id, brand_id=echo_target["brand_id"],
+        row={"url": "https://echo-sale.shop", "domain": "echo-sale.shop",
+             "registrable_domain": "echo-sale.shop"},
+        assessment={"score": 45, "level": "medium", "evidence": []}, priority=45,
     )
     with TestClient(app) as client:
         dashboard = client.get("/")
@@ -95,11 +113,13 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         investigations = client.get("/findings")
         assert investigations.status_code == 200
         assert "Priority belongs to the company; risk belongs to the website" in investigations.text
-        assert "Company priority" in investigations.text
+        assert "Priority</small>" in investigations.text
         assert "Market cap $12.5B" in investigations.text
         assert 'data-company-toggle aria-expanded="false"' in investigations.text
         assert 'class="company-detail-panel"' in investigations.text
         assert "Add to outreach" in investigations.text
+        assert investigations.text.count('class="company-letter-divider"') == 1
+        assert f'src="/companies/{target["brand_id"]}/logo"' in investigations.text
         assert "<p>Example</p>" not in investigations.text
         assert "Example · 1 captured page" not in investigations.text
         assert f'href="/findings/{finding_id}"' in investigations.text
@@ -110,7 +130,10 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         company_partial = client.get("/findings/list", headers={"HX-Request": "true"})
         assert "Review</span>" not in company_partial.text
 
-        company = repository.list_company_investigations()[0]
+        company = next(
+            item for item in repository.list_company_investigations()
+            if item["company_name"] == "Example"
+        )
         added = client.post(
             "/outreach/add",
             data={"csrf_token": csrf_from(investigations), "company_key": company["company_key"]},
@@ -139,10 +162,17 @@ def test_local_hypermedia_assets_and_filter_fallback(tmp_path: Path):
         assert "Search snippet" in detail.text
         assert "example.com" in detail.text
         assert "Detected indicators" in detail.text
+        assert "🧩" in detail.text
+        assert "👶" in detail.text
+        assert "Newly registered domain" in detail.text
         assert "Copy case summary" in detail.text
         assert "Company priority" in detail.text
         assert "Potential brand impersonation case" in detail.text
         assert '<a href="https://example-sale.shop' not in detail.text
+        logo = client.get(f'/companies/{target["brand_id"]}/logo')
+        assert logo.status_code == 200
+        assert logo.headers["content-type"].startswith("image/png")
+        assert logo.content == logo_png
         mappings = client.get("/mappings")
         assert "This is not the suspicious website list" in mappings.text
         exported = client.get(f"/scans/{scan_id}/export/html")

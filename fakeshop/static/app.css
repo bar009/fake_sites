@@ -61,3 +61,19 @@
 @media(max-width:1000px){.company-toggle{grid-template-columns:minmax(220px,1fr) auto 22px;gap:10px}.company-metrics{width:auto}.company-metrics>span{min-width:58px;padding-inline:8px}.outreach-company-card{grid-template-columns:38px minmax(150px,1fr) 100px 100px}.outreach-company-actions{grid-column:2/-1;justify-content:flex-end}}
 @media(max-width:820px){.company-toggle{grid-template-columns:minmax(0,1fr) auto 20px}.company-metrics>span:nth-child(3){display:none}.company-domain-row{grid-template-columns:61px minmax(0,1fr) 18px;grid-template-areas:"risk identity arrow"}.company-domain-row>span:nth-child(3),.company-domain-row>span:nth-child(4){display:none}.company-domain-row>span:nth-child(5){display:flex;grid-area:arrow}.outreach-company-card{grid-template-columns:36px minmax(0,1fr) 105px}.outreach-company-stat:nth-of-type(3){display:none}.outreach-company-actions{grid-column:2/-1}}
 @media(max-width:620px){.company-toggle{grid-template-columns:minmax(0,1fr) 18px;padding:9px 8px}.company-metrics{display:none}.company-title-line{align-items:flex-start;flex-direction:column;gap:3px}.company-title-line>strong{max-width:100%;font-size:12px}.company-market-cap{padding:2px 6px}.outreach-action-slot{padding:7px;border-left:1px solid var(--line)}.outreach-button{min-width:36px;width:36px;height:36px;padding:0}.outreach-button span{display:none}.company-panel-note{align-items:flex-start;flex-direction:column;gap:2px}.outreach-company-card{grid-template-columns:36px minmax(0,1fr);gap:9px}.outreach-company-stat{grid-column:2}.outreach-company-actions{grid-column:1/-1;justify-content:stretch}.outreach-company-actions .button{flex:1}.outreach-company-actions form{display:flex;flex:1}.outreach-company-actions form .button{width:100%}}
+
+/* Alphabetical company directory, cached logos, and visual evidence signals */
+.company-investigation-list{gap:18px}
+.company-letter-section{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:start}
+.company-letter-divider{position:sticky;top:112px;display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#172033;color:#fff;font-size:12px;font-weight:850;box-shadow:0 4px 12px rgba(15,23,42,.12)}
+.company-letter-companies{display:grid;gap:8px;min-width:0}
+.company-logo{width:36px;height:36px;display:grid;place-items:center;flex:none;overflow:hidden;border:1px solid #e2e8f0;border-radius:9px;background:#fff;color:#6366f1}
+.company-logo img{display:block;width:100%;height:100%;padding:5px;object-fit:contain}
+.evidence-list.evidence-emoji-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card{position:relative;display:flex;min-height:150px;padding:18px 14px 14px;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;background:#fbfdff}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card>.evidence-emoji{font-size:34px;line-height:1;filter:saturate(.92)}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card>p{display:grid;gap:5px}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card strong{font-size:11px}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card small{margin:0;line-height:1.5}
+.evidence-list.evidence-emoji-grid>.evidence-emoji-card>b{position:absolute;top:9px;right:9px;padding:3px 6px;border-radius:999px;background:#fef2f2;color:#b91c1c;font-size:8px}
+@media(max-width:620px){.company-letter-section{grid-template-columns:24px minmax(0,1fr);gap:6px}.company-letter-divider{top:104px;width:24px;height:24px;border-radius:7px;font-size:10px}.company-logo{width:34px;height:34px}.company-logo img{padding:4px}.evidence-list.evidence-emoji-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.evidence-list.evidence-emoji-grid>.evidence-emoji-card{min-height:142px;padding:17px 10px 11px}.evidence-list.evidence-emoji-grid>.evidence-emoji-card>.evidence-emoji{font-size:30px}}

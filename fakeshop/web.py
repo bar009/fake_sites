@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from fakeshop.db import Repository
 from fakeshop.finance import FinanceService
 from fakeshop.jobs import ScanWorker
+from fakeshop.logos import CompanyLogoCache
 from fakeshop.security import UnsafeUrlError, validate_public_url
 
 
@@ -31,6 +32,15 @@ PROJECT_ROOT = PACKAGE_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env")
 REVIEW_STATUSES = {"unreviewed", "confirmed", "false_positive", "investigate"}
 ACTIVE_STATUSES = {"queued", "running"}
+EVIDENCE_EMOJIS = {
+    "template_fingerprint": "🧩",
+    "template_phrase": "🧩",
+    "secondary_template_marker": "🧱",
+    "young_domain": "👶",
+    "recent_domain": "📅",
+    "brand_domain_pattern": "🎭",
+    "cross_domain_redirect": "🔀",
+}
 
 
 def load_csv_rows(payload: bytes) -> list[dict]:
@@ -79,6 +89,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     configured_data_dir = os.environ.get("FAKESHOP_DATA_DIR", "").strip()
     data_dir = Path(data_dir or configured_data_dir or PROJECT_ROOT / "data").resolve()
     repository = Repository(data_dir / "fakeshop.db")
+    logo_cache = CompanyLogoCache(data_dir / "company_logos")
     worker = ScanWorker(repository, data_dir)
     csrf_token = secrets.token_urlsafe(32)
 
@@ -98,6 +109,7 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
 
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.filters["money"] = format_money
+    templates.env.filters["evidence_emoji"] = lambda code: EVIDENCE_EMOJIS.get(code, "⚠️")
     app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
 
     @app.middleware("http")
@@ -292,13 +304,13 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     def investigations(request: Request, risk: str = "", review: str = "",
                        q: str = "", sort: str = "company"):
         companies = repository.list_company_investigations(
-            risk=risk, review=review, q=q, sort=sort,
+            risk=risk, review=review, q=q, sort="company",
         )
         return templates.TemplateResponse(
             request, "findings.html",
             context(
                 request, companies=companies, risk_filter=risk,
-                review_filter=review, q_filter=q, sort_filter=sort,
+                review_filter=review, q_filter=q, sort_filter="company",
             ),
         )
 
@@ -306,11 +318,30 @@ def create_app(data_dir: Path | None = None, *, start_worker: bool = True) -> Fa
     def investigations_list(request: Request, risk: str = "", review: str = "",
                             q: str = "", sort: str = "company"):
         companies = repository.list_company_investigations(
-            risk=risk, review=review, q=q, sort=sort,
+            risk=risk, review=review, q=q, sort="company",
         )
         return templates.TemplateResponse(
             request, "partials/company_investigations.html",
             context(request, companies=companies),
+        )
+
+    @app.get("/companies/{brand_id}/logo")
+    def company_logo(brand_id: int):
+        brand = repository.get_brand(brand_id)
+        if not brand:
+            raise HTTPException(404)
+        cached = logo_cache.get(brand.get("official_domain", ""), brand.get("name", ""))
+        if cached:
+            payload, media_type = cached
+            return Response(
+                content=payload, media_type=media_type,
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
+        placeholder = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect width="64" height="64" rx="14" fill="#eef2ff"/><path d="M18 27h28v21H18zM23 27l3-11h12l3 11M27 36h10M32 31v17" fill="none" stroke="#6366f1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
+        return Response(
+            content=placeholder, media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=3600"},
         )
 
     def company_for_key(company_key: str) -> dict:

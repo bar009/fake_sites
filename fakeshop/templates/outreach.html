@@ -19,7 +19,7 @@
     {% for entry in outreach_companies %}
     {% set company = entry.company %}
     <article class="outreach-company-card">
-      <span class="company-letter">{{ entry.company_name[:1]|upper }}</span>
+      <span class="company-logo">{% if company %}<img src="/companies/{{ company.logo_brand_id }}/logo" alt="{{ company.logo_name }} logo" loading="lazy">{% else %}{{ icon('mapping', 18) }}{% endif %}</span>
       <div class="outreach-company-copy"><strong>{{ entry.company_name }}</strong><small>Added {{ entry.created_at }}</small></div>
       <div class="outreach-company-stat"><small>Market cap</small><strong>{% if company %}{{ company.market_cap_usd|money }}{% else %}Not available{% endif %}</strong></div>
       <div class="outreach-company-stat"><small>Company priority</small><strong>{% if company %}{{ company.priority_score }}/100{% else %}Unavailable{% endif %}</strong></div>

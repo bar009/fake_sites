@@ -362,6 +362,13 @@ class Repository:
             ).fetchone()
             return int(row["id"])
 
+    def get_brand(self, brand_id: int) -> dict | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM brands WHERE id=?", (brand_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
     def create_scan(self, *, kind: str, targets: Iterable[dict], provider: str,
                     top_n: int, source_name: str = "") -> int:
         targets = list(targets)
@@ -703,10 +710,18 @@ class Repository:
                 if key[0] == "company"
                 else representative["brand"]
             )
+            logo_source = next(
+                (item for item in complete_domains if (item.get("official_domain") or "").strip()),
+                representative,
+            )
             companies.append({
                 "company_key": self._company_key_text(key),
                 "anchor_id": min(int(item["brand_id"]) for item in complete_domains),
                 "company_name": company_name,
+                "directory_letter": (company_name[:1] or "#").upper(),
+                "logo_brand_id": int(logo_source["brand_id"]),
+                "logo_name": logo_source["brand"],
+                "official_domain": logo_source.get("official_domain") or "",
                 "brands": sorted({item["brand"] for item in complete_domains}, key=str.casefold),
                 "ticker": representative.get("ticker") or "",
                 "market_cap_usd": representative.get("market_cap_usd"),
