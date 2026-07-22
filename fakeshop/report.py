@@ -83,7 +83,7 @@ def write_html(rows: list[dict], path: Path, run_name: str) -> None:
         by_brand.setdefault(row["brand"], []).append(row)
 
     parts = [f"""<!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <title>Fake Shop Report - {html.escape(run_name)}</title>
@@ -108,13 +108,13 @@ def write_html(rows: list[dict], path: Path, run_name: str) -> None:
 </style>
 </head>
 <body>
-<h1>דו"ח אתרים חשודים — {html.escape(run_name)}</h1>
-<p>סה"כ מותגים: {len(by_brand)} | סה"כ תוצאות: {len(rows)}</p>
+<h1>Suspected Fake Shop Report — {html.escape(run_name)}</h1>
+<p>Total brands: {len(by_brand)} | Total results: {len(rows)}</p>
 """]
 
     flagged = [r for r in rows if r.get("flags")]
     if flagged:
-        parts.append(f'<div class="summary"><h2>🚩 {len(flagged)} אתרים חשודים</h2><ul>')
+        parts.append(f'<div class="summary"><h2>🚩 {len(flagged)} suspicious sites</h2><ul>')
         for r in flagged:
             age = r.get("domain_age_days")
             age_txt = f"{age} days" if age is not None else "?"
@@ -133,7 +133,7 @@ def write_html(rows: list[dict], path: Path, run_name: str) -> None:
         parts.append(f'<div class="brand" id="brand-{_slug(brand)}"><h2>{html.escape(brand)}{topic_html}</h2>')
         real_rows = [r for r in brand_rows if r.get("url")]
         if not real_rows:
-            parts.append('<p class="none">לא נמצאו תוצאות חיפוש</p></div>')
+            parts.append('<p class="none">No search results were found</p></div>')
             continue
         parts.append('<div class="cards">')
         for row in real_rows:

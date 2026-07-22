@@ -1,0 +1,27 @@
+{% from "macros/ui.html" import icon, risk_badge, status_badge %}
+<div id="findings-results" class="results-panel">
+  <div class="results-summary"><strong>{{ findings|length }}</strong> domains shown</div>
+  {% if findings %}
+  <div class="finding-table" role="table" aria-label="Scan findings">
+    <div class="finding-table-head" role="row">
+      <span>Risk</span><span>Website case</span><span>Age</span><span>Indicators</span><span>Company priority</span><span>Review</span><span>Open</span>
+    </div>
+    {% for finding in findings %}
+    <a class="finding-row" href="/findings/{{ finding.id }}" role="row" aria-label="Open investigation for {{ finding.registrable_domain or finding.domain }}">
+      <span>{{ risk_badge(finding.risk_level, finding.risk_score) }}</span>
+      <span class="finding-identity">
+        {% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="Screenshot of {{ finding.registrable_domain or finding.domain }}" loading="lazy">{% else %}<span class="thumb-placeholder">{{ icon('shield', 18) }}</span>{% endif %}
+        <span><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{{ finding.brand }} · {{ finding.page_count }} captured page{% if finding.page_count != 1 %}s{% endif %}{% if finding.scan_count is defined and finding.scan_count > 1 %} · {{ finding.scan_count }} scans{% endif %}</small><code class="finding-safe-url">{{ finding.url }}</code></span>
+      </span>
+      <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</span>
+      <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>signals</small></span>
+      <span class="priority-score" title="Priority for {{ finding.parent_company or finding.brand }}">{{ finding.company_priority_score }}</span>
+      <span>{{ status_badge(finding.review_status) }}</span>
+      <span class="row-arrow">{{ icon('chevron', 17) }}<span class="sr-only">Open case</span></span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-panel"><span>{{ icon('search', 24) }}</span><strong>No matching findings</strong><p>Change the search or remove a filter.</p></div>
+  {% endif %}
+</div>

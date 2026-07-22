@@ -1,0 +1,205 @@
+import re
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+import fakeshop.web as web
+
+
+def csrf_from(response) -> str:
+    match = re.search(r'name="csrf_token" value="([^"]+)"', response.text)
+    assert match
+    return match.group(1)
+
+
+def test_dashboard_and_brand_scan(tmp_path: Path):
+    app = web.create_app(tmp_path, start_worker=False)
+    with TestClient(app) as client:
+        dashboard = client.get("/")
+        assert dashboard.status_code == 200
+        assert 'lang="en" dir="ltr"' in dashboard.text
+        assert "Yahoo Finance through yfinance" in dashboard.text
+
+        form = client.get("/scans/new")
+        response = client.post(
+            "/scans/brand",
+            data={"csrf_token": csrf_from(form), "brand": "Nike", "provider": "ddgs", "top_n": 3},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        detail = client.get(response.headers["location"])
+        assert "Nike" in detail.text
+        assert "Queued" in detail.text
+
+
+def test_csv_upload_and_url_validation(monkeypatch, tmp_path: Path):
+    app = web.create_app(tmp_path, start_worker=False)
+    monkeypatch.setattr(web, "validate_public_url", lambda value: value)
+    with TestClient(app) as client:
+        form = client.get("/scans/new")
+        token = csrf_from(form)
+        upload = client.post(
+            "/scans/csv",
+            data={"csrf_token": token, "provider": "ddgs", "top_n": 2},
+            files={"file": ("brands.csv", b"brand,topic\nNike,sportswear\n", "text/csv")},
+            follow_redirects=False,
+        )
+        assert upload.status_code == 303
+
+        direct = client.post(
+            "/scans/url",
+            data={"csrf_token": token, "brand": "Nike", "url": "https://nike-outlet.shop"},
+            follow_redirects=False,
+        )
+        assert direct.status_code == 303
+
+
+def test_local_hypermedia_assets_and_filter_fallback(monkeypatch, tmp_path: Path):
+    logo_png = b"\x89PNG\r\n\x1a\ncompany-logo"
+    monkeypatch.setattr(
+        web.CompanyLogoCache, "get",
+        lambda self, domain, company_name="": (logo_png, "image/png"),
+    )
+    app = web.create_app(tmp_path, start_worker=False)
+    repository = app.state.repository
+    scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Example",
+        targets=[{"brand": "Example", "official_domain": "example.com"}],
+    )
+    target = repository.pending_targets(scan_id)[0]
+    screenshot = tmp_path / "scans" / str(scan_id) / "example.png"
+    screenshot.parent.mkdir(parents=True)
+    screenshot.write_bytes(b"not-a-real-png")
+    finding_id = repository.add_finding(
+        scan_id=scan_id, brand_id=target["brand_id"],
+        row={"url": "https://example-sale.shop/path", "domain": "example-sale.shop",
+             "registrable_domain": "example-sale.shop", "query": "site:.shop query",
+             "search_title": "Search title", "search_snippet": "Search snippet",
+             "page_title": "Page title", "final_url": "https://redirect.shop/",
+             "screenshot_path": str(screenshot)},
+        assessment={"score": 80, "level": "high", "evidence": [
+            {"code": "template_phrase", "label": "Storefront template fingerprint",
+             "detail": "Phrase found", "points": 40},
+            {"code": "young_domain", "label": "Newly registered domain",
+             "detail": "The domain was registered 12 days ago", "points": 25},
+        ]}, priority=80,
+    )
+    repository.save_mapping(
+        target["brand_id"], parent_company="Example", ticker="EXM",
+        status="confirmed", market_cap_usd=12_500_000_000,
+    )
+    echo_scan_id = repository.create_scan(
+        kind="brand", provider="ddgs", top_n=1, source_name="Echo",
+        targets=[{"brand": "Echo", "official_domain": "echo.example"}],
+    )
+    echo_target = repository.pending_targets(echo_scan_id)[0]
+    repository.add_finding(
+        scan_id=echo_scan_id, brand_id=echo_target["brand_id"],
+        row={"url": "https://echo-sale.shop", "domain": "echo-sale.shop",
+             "registrable_domain": "echo-sale.shop"},
+        assessment={"score": 45, "level": "medium", "evidence": []}, priority=45,
+    )
+    with TestClient(app) as client:
+        dashboard = client.get("/")
+        assert "/static/vendor/htmx.min.js" in dashboard.text
+        assert '/static/favicon.svg' in dashboard.text
+        favicon = client.get("/favicon.ico")
+        assert favicon.status_code == 200
+        assert favicon.headers["content-type"].startswith("image/svg+xml")
+        assert "unpkg.com" not in dashboard.text
+        assert "https://unpkg.com" not in dashboard.headers["content-security-policy"]
+        assert "High-risk companies" in dashboard.text
+        assert "Awaiting review (companies)" in dashboard.text
+        investigations = client.get("/findings")
+        assert investigations.status_code == 200
+        assert "Priority belongs to the company; risk belongs to the website" in investigations.text
+        assert "Priority</small>" in investigations.text
+        assert "Market cap $12.5B" in investigations.text
+        assert 'data-company-toggle aria-expanded="false"' in investigations.text
+        assert 'class="company-detail-panel"' in investigations.text
+        assert "Add to outreach" in investigations.text
+        assert investigations.text.count('class="company-letter-divider"') == 1
+        assert f'src="/companies/{target["brand_id"]}/logo"' in investigations.text
+        assert "<p>Example</p>" not in investigations.text
+        assert "Example · 1 captured page" not in investigations.text
+        assert f'href="/findings/{finding_id}"' in investigations.text
+        assert "https://example-sale.shop/path" in investigations.text
+        assert f'src="/findings/{finding_id}/screenshot"' in investigations.text
+        global_partial = client.get("/findings/list?risk=low", headers={"HX-Request": "true"})
+        assert "No matching companies" in global_partial.text
+        company_partial = client.get("/findings/list", headers={"HX-Request": "true"})
+        assert "Review</span>" not in company_partial.text
+
+        company = next(
+            item for item in repository.list_company_investigations()
+            if item["company_name"] == "Example"
+        )
+        added = client.post(
+            "/outreach/add",
+            data={"csrf_token": csrf_from(investigations), "company_key": company["company_key"]},
+            headers={"HX-Request": "true"},
+        )
+        assert added.status_code == 200
+        assert added.headers["HX-Refresh"] == "true"
+        assert repository.outreach_count() == 1
+        outreach = client.get("/outreach")
+        assert "Example" in outreach.text
+        assert "$12.5B" in outreach.text
+        removed = client.post(
+            "/outreach/remove",
+            data={"csrf_token": csrf_from(outreach), "company_key": company["company_key"],
+                  "return_to": "/outreach"},
+            follow_redirects=False,
+        )
+        assert removed.status_code == 303
+        assert repository.outreach_count() == 0
+        filtered = client.get(f"/scans/{scan_id}?risk=high&q=example")
+        assert filtered.status_code == 200 and "example-sale.shop" in filtered.text
+        partial = client.get(f"/scans/{scan_id}/findings?risk=low", headers={"HX-Request": "true"})
+        assert "No matching findings" in partial.text
+        detail = client.get(f"/findings/{finding_id}")
+        assert "site:.shop query" in detail.text
+        assert "Search snippet" in detail.text
+        assert "example.com" in detail.text
+        assert "Detected indicators" in detail.text
+        assert "🧩" in detail.text
+        assert "👶" in detail.text
+        assert "Newly registered domain" in detail.text
+        assert "Copy case summary" in detail.text
+        assert "Company priority" in detail.text
+        assert "Potential brand impersonation case" in detail.text
+        assert '<a href="https://example-sale.shop' not in detail.text
+        logo = client.get(f'/companies/{target["brand_id"]}/logo')
+        assert logo.status_code == 200
+        assert logo.headers["content-type"].startswith("image/png")
+        assert logo.content == logo_png
+        mappings = client.get("/mappings")
+        assert "This is not the suspicious website list" in mappings.text
+        exported = client.get(f"/scans/{scan_id}/export/html")
+        assert "<html lang='en' dir='ltr'>" in exported.text
+        assert "Scan #" in exported.text
+
+
+def test_windows_readme_requires_no_terminal_knowledge():
+    root = web.PROJECT_ROOT
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    launcher = (root / "start_windows.bat").read_text(encoding="utf-8")
+    assert "Add python.exe to PATH" in readme
+    assert "Extract All" in readme
+    assert "Double-click `start_windows.bat`" in readme
+    assert "Open in Terminal" not in readme
+    assert "-m fakeshop.web" in launcher
+    assert "playwright install chromium" in launcher
+    assert (web.PACKAGE_DIR / "static" / "favicon.svg").is_file()
+
+
+def test_user_interface_contains_no_fixed_hebrew_copy():
+    hebrew = re.compile(r"[\u0590-\u05ff]")
+    files = list((web.PACKAGE_DIR / "templates").rglob("*.html")) + [
+        web.PACKAGE_DIR / "static" / "app.js",
+        web.PACKAGE_DIR / "static" / "vendor" / "htmx.min.js",
+    ]
+    assert not {
+        str(path): hebrew.findall(path.read_text(encoding="utf-8"))
+        for path in files if hebrew.search(path.read_text(encoding="utf-8"))
+    }

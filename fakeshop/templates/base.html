@@ -1,0 +1,50 @@
+{% from "macros/ui.html" import icon %}
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>{% block title %}Fake Shop Checker{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <script src="{{ url_for('static', path='vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="drawer-scrim" data-drawer-close hidden></div>
+  <aside class="app-sidebar" id="app-sidebar" aria-label="Main navigation">
+    <div class="sidebar-brand">
+      <span class="brand-symbol"><img src="{{ url_for('static', path='favicon.svg') }}" alt=""></span>
+      <span><strong>Fake Shop Checker</strong><small>Impersonation intelligence</small></span>
+      <button class="icon-button sidebar-close" type="button" data-drawer-close aria-label="Close navigation">{{ icon('close') }}</button>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-label">Operations</span>
+      <a href="/" {% if current_path == '/' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}<span>Overview</span></a>
+      <a href="/findings" {% if current_path.startswith('/findings') %}aria-current="page"{% endif %}>{{ icon('shield') }}<span>Investigations</span></a>
+      <a href="/outreach" {% if current_path.startswith('/outreach') %}aria-current="page"{% endif %}>{{ icon('alert') }}<span>Outreach list</span>{% if outreach_count %}<small class="nav-count">{{ outreach_count }}</small>{% endif %}</a>
+      <a href="/scans/new" {% if current_path == '/scans/new' %}aria-current="page"{% endif %}>{{ icon('scan') }}<span>New scan</span></a>
+      <span class="nav-label nav-label-secondary">Supporting data</span>
+      <a href="/mappings" {% if current_path.startswith('/mappings') %}aria-current="page"{% endif %}>{{ icon('mapping') }}<span>Company mappings</span></a>
+    </nav>
+    <div class="sidebar-note">{{ icon('shield', 20) }}<p><strong>Local research environment</strong><small>Suspect URLs are never presented as clickable links.</small></p></div>
+  </aside>
+  <div class="app-frame">
+    <header class="topbar">
+      <button class="icon-button menu-button" type="button" data-drawer-open aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">{{ icon('menu') }}</button>
+      <div class="topbar-title"><span class="brand-symbol compact"><img src="{{ url_for('static', path='favicon.svg') }}" alt=""></span><span>Fake Shop Checker</span></div>
+      <a class="button button-primary topbar-action" href="/scans/new" aria-label="New scan">{{ icon('scan', 16) }}<span>New scan</span></a>
+    </header>
+    <aside class="finance-strip" role="note">
+      <span class="live-dot"></span>
+      <strong>Market data disclosure</strong>
+      <span>Yahoo Finance through yfinance (unofficial) · Indicative data only</span>
+      {% if finance_status.successful %}<span>Last successful market-cap update: <bdi>{{ finance_status.successful }}</bdi></span>{% elif finance_status.attempted %}<span>Last mapping attempt: <bdi>{{ finance_status.attempted }}</bdi></span>{% else %}<span>No mapping attempt yet</span>{% endif %}
+    </aside>
+    <main class="page-shell" id="main-content" tabindex="-1">{% block content %}{% endblock %}</main>
+  </div>
+  <div class="toast-viewport" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>

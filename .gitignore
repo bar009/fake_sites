@@ -1,5 +1,15 @@
 .venv/
 runs/
+data/
 .env
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+master_report.html
+master_results.xlsx

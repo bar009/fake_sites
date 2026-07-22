@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon, kpi, risk_badge, status_badge %}
+{% block title %}Overview — Fake Shop Checker{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><span class="section-kicker">Security operations</span><h1>Overview</h1><p>Urgent findings, active scans, and the latest operational picture.</p></div>
+  <a class="button button-primary" href="/scans/new">{{ icon('scan', 17) }} New scan</a>
+</header>
+
+<section class="kpi-grid" aria-label="System metrics">
+  <a class="kpi-link" href="/findings">{{ kpi('Unique domains', stats.findings, 'Across all investigation history', 'shield', 'blue') }}</a>
+  <a class="kpi-link" href="/findings?risk=high">{{ kpi('High-risk companies', stats.high_companies, 'Distinct affected brands', 'alert', 'red') }}</a>
+  <a class="kpi-link" href="/findings?review=open">{{ kpi('Awaiting review (companies)', stats.pending_review_companies, 'Distinct brands with open cases', 'activity', 'amber') }}</a>
+  <a class="kpi-link" href="#scan-history">{{ kpi('Scan history', stats.scans, 'All completed and active runs', 'scan', 'cyan') }}</a>
+</section>
+
+{% if active_scans %}
+<section class="dashboard-section">
+  <div class="section-heading"><div><span class="section-kicker">Live queue</span><h2>Active scans</h2></div><span class="section-count">{{ active_scans|length }}</span></div>
+  <div class="active-grid">
+    {% for scan in active_scans %}
+    <a class="active-scan-card" href="/scans/{{ scan.id }}">
+      <div><span class="pulse-dot"></span>{{ status_badge(scan.status) }}</div>
+      <strong>{{ scan.source_name or scan.kind }}</strong>
+      <small>{{ scan.progress_current }} of {{ scan.progress_total }} target{% if scan.progress_total != 1 %}s{% endif %}</small>
+      <span class="progress-track"><i style="width:{{ (scan.progress_current * 100 / scan.progress_total) if scan.progress_total else 0 }}%"></i></span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="dashboard-grid">
+  <section class="dashboard-section urgent-section">
+    <div class="section-heading"><div><span class="section-kicker">Priority queue</span><h2>Priority companies</h2></div><a href="/findings?sort=priority">View all →</a></div>
+    {% if urgent_companies %}
+    <div class="urgent-list">
+      {% for company in urgent_companies %}
+      <a class="urgent-row" href="/findings#company-{{ company.anchor_id }}">
+        {{ risk_badge(company.risk_level, company.risk_score) }}
+        <span class="urgent-identity"><strong>{{ company.company_name }}</strong><small>Company priority {{ company.priority_score }} · {{ company.domain_count }} domain{% if company.domain_count != 1 %}s{% endif %}</small></span>
+        <span class="badge badge-needs_review"><span class="badge-dot"></span>{{ company.awaiting_review_count }} open</span>
+        {{ icon('chevron', 17) }}
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-panel compact"><span>{{ icon('shield', 24) }}</span><strong>No companies awaiting review</strong><p>Companies with open investigation cases will appear here.</p></div>{% endif %}
+  </section>
+
+  <section class="dashboard-section recent-section" id="scan-history">
+    <div class="section-heading"><div><span class="section-kicker">Recent activity</span><h2>Recent scans</h2></div><a href="/scans/new">New →</a></div>
+    {% if scans %}<div class="recent-list">
+      {% for scan in scans[:6] %}
+      <a class="recent-row" href="/scans/{{ scan.id }}">
+        <span class="scan-number">#{{ scan.id }}</span>
+        <span><strong>{{ scan.source_name or scan.kind }}</strong><small>{{ scan.created_at }}</small></span>
+        {{ status_badge(scan.status) }}
+        <span class="recent-metric"><strong>{{ scan.finding_count }}</strong><small>domains</small></span>
+      </a>
+      {% endfor %}
+    </div>{% else %}<div class="empty-panel compact"><strong>No scans yet</strong><p>Start with a CSV file, one brand, or a URL.</p><a class="button button-primary" href="/scans/new">Start the first scan</a></div>{% endif %}
+  </section>
+</div>
+{% endblock %}
