@@ -10,7 +10,7 @@
   <article class="indicator-stat indicator-risk-{{ finding.risk_level }}"><span>Risk score</span><strong>{{ finding.risk_score }}<small>/100</small></strong><p>{{ finding.risk_level|capitalize }} likelihood indicators</p></article>
   <article class="indicator-stat"><span>Detected indicators</span><strong>{{ finding.evidence|length }}</strong><p>Explainable scoring signals</p></article>
   <article class="indicator-stat"><span>Domain age</span><strong>{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }}<small> days</small>{% else %}—{% endif %}</strong><p>{% if finding.domain_age_days is not none and finding.domain_age_days <= 180 %}Recently registered{% else %}Registration context{% endif %}</p></article>
-  <article class="indicator-stat indicator-priority"><span>Investigation priority</span><strong>{{ finding.priority_score }}<small>/100</small></strong><p>Risk plus business impact</p></article>
+  <article class="indicator-stat indicator-priority"><span>Company priority</span><strong>{{ finding.company_priority_score }}<small>/100</small></strong><p>Highest active risk plus business impact</p></article>
 </section>
 <div class="case-disclaimer">{{ icon('alert', 17) }}<span><strong>Indicator-based assessment, not a verdict.</strong> Review the screenshot and evidence before reporting this domain to the brand.</span></div>
 <div class="finding-layout">
@@ -33,7 +33,7 @@
       </dl>
     </article>
 
-    <article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Risk evidence</span><h2>Signals and findings</h2></div></div>{% if finding.evidence %}<div class="evidence-list">{% for item in finding.evidence %}<div><span>+{{ item.points }}</span><p><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></p></div>{% endfor %}</div>{% else %}<div class="empty-panel compact"><strong>No risk signals detected</strong><p>Based on the current scoring rules.</p></div>{% endif %}{% if finding.error %}<div class="error-box">{{ finding.error }}</div>{% endif %}</article>
+    <article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Risk evidence</span><h2>Signals and findings</h2></div></div>{% if finding.evidence %}<div class="evidence-list evidence-emoji-grid">{% for item in finding.evidence %}<div class="evidence-emoji-card"><span class="evidence-emoji" aria-hidden="true">{{ item.code|evidence_emoji }}</span><p><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></p><b>+{{ item.points }}</b></div>{% endfor %}</div>{% else %}<div class="empty-panel compact"><strong>No risk signals detected</strong><p>Based on the current scoring rules.</p></div>{% endif %}{% if finding.error %}<div class="error-box">{{ finding.error }}</div>{% endif %}</article>
 
     {% if related %}<article class="panel-card"><div class="panel-title"><div><span class="section-kicker">Domain group</span><h2>Other pages from this domain</h2></div></div><div class="related-list">{% for item in related %}<a href="/findings/{{ item.id }}"><span><strong>{{ item.page_title or item.search_title or item.domain }}</strong><code>{{ item.url }}</code></span><span>{{ item.risk_score }}</span>{{ icon('chevron', 16) }}</a>{% endfor %}</div></article>{% endif %}
   </section>
@@ -43,7 +43,7 @@ Brand: {{ finding.brand }}
 Suspect URL: {{ finding.url }}
 Registered domain: {{ finding.registrable_domain or finding.domain }}
 Risk score: {{ finding.risk_score }}/100 ({{ finding.risk_level }})
-Priority score: {{ finding.priority_score }}/100
+Company priority: {{ finding.company_priority_score }}/100
 Detected indicators: {{ finding.evidence|length }}
 Captured: {{ finding.created_at }}
 Analyst status: {{ finding.review_status }}</div><p class="context-note">Verify the evidence and add your contact details before sending this summary to a brand or abuse team.</p><button class="button button-primary" type="button" data-copy-target="case-summary" data-copy-message="Case summary copied">{{ icon('copy', 16) }} Copy summary</button></article>

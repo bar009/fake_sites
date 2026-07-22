@@ -3,24 +3,23 @@
 {% block title %}Investigations — Fake Shop Checker{% endblock %}
 {% block content %}
 <header class="page-header">
-  <div><span class="section-kicker">Website evidence</span><h1>Investigations</h1><p>Suspicious domains found across every scan, grouped into reviewable cases.</p></div>
+  <div><span class="section-kicker">Company investigations</span><h1>Investigations</h1><p>Companies are listed alphabetically. Open a domain beneath a company to inspect its screenshot and evidence.</p></div>
   <a class="button button-primary" href="/scans/new">{{ icon('scan', 17) }} New scan</a>
 </header>
 
 <section class="purpose-banner" aria-label="How to use investigations">
   <span class="purpose-icon">{{ icon('shield', 22) }}</span>
-  <div><strong>Open any row to review the website</strong><p>Each case contains the captured PNG, suspect URL, risk indicators, discovery evidence, official-domain context, and an analyst decision. Use the evidence after human review when reporting impersonation to a company.</p></div>
+  <div><strong>Priority belongs to the company; risk belongs to the website</strong><p>Each company has one priority score based on its highest active risk and business impact. Domain rows show website-specific risk, screenshots, and indicators.</p></div>
 </section>
 
 <section class="dashboard-section findings-section">
-  <div class="section-heading"><div><span class="section-kicker">Case library</span><h2>Suspicious website cases</h2></div><small>{{ findings|length }} unique brand and domain combination{% if findings|length != 1 %}s{% endif %}</small></div>
+  <div class="section-heading"><div><span class="section-kicker">Company directory</span><h2>Companies with website evidence</h2></div><small>{{ companies|length }} compan{% if companies|length == 1 %}y{% else %}ies{% endif %} shown</small></div>
   <form class="results-toolbar" method="get" action="/findings" hx-get="/findings/list" hx-target="#findings-results" hx-push-url="/findings" hx-trigger="change, submit">
     <label class="search-field"><span class="sr-only">Search</span>{{ icon('search', 17) }}<input name="q" value="{{ q_filter }}" placeholder="Search URL, domain, brand, or company"></label>
     <label><span class="sr-only">Risk</span><select name="risk"><option value="">All risk levels</option><option value="high" {% if risk_filter=='high' %}selected{% endif %}>High</option><option value="medium" {% if risk_filter=='medium' %}selected{% endif %}>Medium</option><option value="low" {% if risk_filter=='low' %}selected{% endif %}>Low</option></select></label>
     <label><span class="sr-only">Review</span><select name="review"><option value="">All review statuses</option><option value="open" {% if review_filter=='open' %}selected{% endif %}>Awaiting review</option><option value="unreviewed" {% if review_filter=='unreviewed' %}selected{% endif %}>Unreviewed</option><option value="confirmed" {% if review_filter=='confirmed' %}selected{% endif %}>Confirmed suspicious</option><option value="false_positive" {% if review_filter=='false_positive' %}selected{% endif %}>False positive</option><option value="investigate" {% if review_filter=='investigate' %}selected{% endif %}>Needs investigation</option></select></label>
-    <label><span class="sr-only">Sort</span><select name="sort"><option value="priority" {% if sort_filter=='priority' %}selected{% endif %}>Priority</option><option value="risk" {% if sort_filter=='risk' %}selected{% endif %}>Risk</option><option value="date" {% if sort_filter=='date' %}selected{% endif %}>Newest</option><option value="domain" {% if sort_filter=='domain' %}selected{% endif %}>Domain</option></select></label>
     <button class="button button-quiet" type="submit">Update</button>
   </form>
-  {% include "partials/findings_table.html" %}
+  {% include "partials/company_investigations.html" %}
 </section>
 {% endblock %}

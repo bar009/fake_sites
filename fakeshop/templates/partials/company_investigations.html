@@ -1,0 +1,55 @@
+{% from "macros/ui.html" import icon, risk_badge %}
+<div id="findings-results" class="company-investigation-list">
+{% if companies %}
+  {% for letter_group in companies|groupby('directory_letter') %}
+  <section class="company-letter-section" aria-label="Companies beginning with {{ letter_group.grouper }}">
+    <div class="company-letter-divider"><span>{{ letter_group.grouper }}</span></div>
+    <div class="company-letter-companies">
+  {% for company in letter_group.list %}
+  <section class="company-investigation" id="company-{{ company.anchor_id }}">
+    <div class="company-compact-row">
+      <button class="company-toggle" type="button" data-company-toggle aria-expanded="false" aria-controls="company-panel-{{ company.anchor_id }}">
+        <span class="company-heading">
+          <span class="company-logo"><img src="/companies/{{ company.logo_brand_id }}/logo" alt="{{ company.logo_name }} logo" loading="lazy"></span>
+          <span class="company-heading-copy">
+            <span class="company-title-line"><strong>{{ company.company_name }}</strong><span class="company-market-cap">Market cap {{ company.market_cap_usd|money }}</span></span>
+            {% set same_single_brand = company.brands|length == 1 and company.brands[0]|lower == company.company_name|lower %}
+            {% if not same_single_brand or company.ticker %}<small>{% if company.brands|length > 1 %}Brands: {{ company.brands|join(', ') }}{% elif not same_single_brand %}Brand: {{ company.brands[0] }}{% endif %}{% if company.ticker %}{% if not same_single_brand %} · {% endif %}{{ company.ticker }}{% endif %}</small>{% endif %}
+          </span>
+        </span>
+        <span class="company-metrics" aria-label="Company investigation metrics">
+          <span><small>Priority</small><strong>{{ company.priority_score }}<small>/100</small></strong></span>
+          <span><small>Domains</small><strong>{{ company.domain_count }}</strong></span>
+          <span><small>High risk</small><strong>{{ company.high_domain_count }}</strong></span>
+        </span>
+        <span class="company-toggle-chevron">{{ icon('chevron', 18) }}<span class="sr-only">Open or close company websites</span></span>
+      </button>
+      {% include "partials/outreach_action.html" %}
+    </div>
+    <div class="company-detail-panel" id="company-panel-{{ company.anchor_id }}" hidden>
+      <div class="company-panel-note"><strong>{{ company.visible_domain_count }} website{% if company.visible_domain_count != 1 %}s{% endif %} shown</strong><span>{{ company.page_count }} captured page{% if company.page_count != 1 %}s{% endif %} across all scans</span></div>
+      <div class="company-domain-head" aria-hidden="true"><span>Website risk</span><span>Domain evidence</span><span>Age</span><span>Indicators</span><span>Open</span></div>
+      <div class="company-domain-list">
+        {% for finding in company.domains %}
+        <a class="company-domain-row" href="/findings/{{ finding.id }}" aria-label="Open website evidence for {{ finding.registrable_domain or finding.domain }}">
+          <span>{{ risk_badge(finding.risk_level, finding.risk_score) }}</span>
+          <span class="finding-identity">
+            {% if finding.screenshot_path %}<img src="/findings/{{ finding.id }}/screenshot" alt="Screenshot of {{ finding.registrable_domain or finding.domain }}" loading="lazy">{% else %}<span class="thumb-placeholder">{{ icon('shield', 18) }}</span>{% endif %}
+            <span><strong>{{ finding.registrable_domain or finding.domain }}</strong><small>{% if finding.brand|lower != company.company_name|lower %}{{ finding.brand }} · {% endif %}{{ finding.page_count }} captured page{% if finding.page_count != 1 %}s{% endif %}</small><code class="finding-safe-url">{{ finding.url }}</code></span>
+          </span>
+          <span class="table-meta">{% if finding.domain_age_days is not none %}{{ finding.domain_age_days }} days{% else %}Unknown{% endif %}</span>
+          <span class="signal-count"><strong>{{ finding.evidence|length }}</strong><small>signals</small></span>
+          <span class="row-arrow">{{ icon('chevron', 17) }}<span class="sr-only">Open website case</span></span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+  <div class="empty-panel"><span>{{ icon('search', 24) }}</span><strong>No matching companies</strong><p>Change the search or remove a filter.</p></div>
+{% endif %}
+</div>

@@ -31,6 +31,15 @@
   document.addEventListener("click", async (event) => {
     if (event.target.closest("[data-drawer-open]")) setDrawer(true);
     if (event.target.closest("[data-drawer-close]")) setDrawer(false);
+    const companyToggle = event.target.closest("[data-company-toggle]");
+    if (companyToggle) {
+      const panel = document.getElementById(companyToggle.getAttribute("aria-controls"));
+      if (!panel) return;
+      const open = companyToggle.getAttribute("aria-expanded") !== "true";
+      companyToggle.setAttribute("aria-expanded", String(open));
+      panel.hidden = !open;
+      return;
+    }
     const button = event.target.closest("[data-copy-target]");
     if (!button) return;
     const target = document.getElementById(button.dataset.copyTarget);
@@ -86,4 +95,16 @@
   });
 
   document.body.addEventListener("showToast", (event) => showToast(event.detail?.message, event.detail?.tone));
+
+  function openCompanyFromHash() {
+    if (!location.hash.startsWith("#company-")) return;
+    const company = document.querySelector(location.hash);
+    const toggle = company?.querySelector("[data-company-toggle]");
+    const panel = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
+    if (!toggle || !panel) return;
+    toggle.setAttribute("aria-expanded", "true");
+    panel.hidden = false;
+  }
+  openCompanyFromHash();
+  window.addEventListener("hashchange", openCompanyFromHash);
 })();

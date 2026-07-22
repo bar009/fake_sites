@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1220">
   <title>{% block title %}Fake Shop Checker{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
   <script src="{{ url_for('static', path='vendor/htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='app.js') }}" defer></script>
@@ -15,7 +16,7 @@
   <div class="drawer-scrim" data-drawer-close hidden></div>
   <aside class="app-sidebar" id="app-sidebar" aria-label="Main navigation">
     <div class="sidebar-brand">
-      <span class="brand-symbol">FS</span>
+      <span class="brand-symbol"><img src="{{ url_for('static', path='favicon.svg') }}" alt=""></span>
       <span><strong>Fake Shop Checker</strong><small>Impersonation intelligence</small></span>
       <button class="icon-button sidebar-close" type="button" data-drawer-close aria-label="Close navigation">{{ icon('close') }}</button>
     </div>
@@ -23,6 +24,7 @@
       <span class="nav-label">Operations</span>
       <a href="/" {% if current_path == '/' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}<span>Overview</span></a>
       <a href="/findings" {% if current_path.startswith('/findings') %}aria-current="page"{% endif %}>{{ icon('shield') }}<span>Investigations</span></a>
+      <a href="/outreach" {% if current_path.startswith('/outreach') %}aria-current="page"{% endif %}>{{ icon('alert') }}<span>Outreach list</span>{% if outreach_count %}<small class="nav-count">{{ outreach_count }}</small>{% endif %}</a>
       <a href="/scans/new" {% if current_path == '/scans/new' %}aria-current="page"{% endif %}>{{ icon('scan') }}<span>New scan</span></a>
       <span class="nav-label nav-label-secondary">Supporting data</span>
       <a href="/mappings" {% if current_path.startswith('/mappings') %}aria-current="page"{% endif %}>{{ icon('mapping') }}<span>Company mappings</span></a>
@@ -32,7 +34,7 @@
   <div class="app-frame">
     <header class="topbar">
       <button class="icon-button menu-button" type="button" data-drawer-open aria-controls="app-sidebar" aria-expanded="false" aria-label="Open navigation">{{ icon('menu') }}</button>
-      <div class="topbar-title"><span class="brand-symbol compact">FS</span><span>Fake Shop Checker</span></div>
+      <div class="topbar-title"><span class="brand-symbol compact"><img src="{{ url_for('static', path='favicon.svg') }}" alt=""></span><span>Fake Shop Checker</span></div>
       <a class="button button-primary topbar-action" href="/scans/new" aria-label="New scan">{{ icon('scan', 16) }}<span>New scan</span></a>
     </header>
     <aside class="finance-strip" role="note">

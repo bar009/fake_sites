@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "macros/ui.html" import icon %}
+{% block title %}Outreach list — Fake Shop Checker{% endblock %}
+{% block content %}
+<header class="page-header">
+  <div><span class="section-kicker">Contact queue</span><h1>Company outreach list</h1><p>Companies you marked for human follow-up after reviewing suspicious website evidence.</p></div>
+  <a class="button button-primary" href="/findings">{{ icon('shield', 17) }} Review companies</a>
+</header>
+
+<section class="purpose-banner" aria-label="About the outreach list">
+  <span class="purpose-icon">{{ icon('alert', 22) }}</span>
+  <div><strong>This list records a follow-up decision, not a final fraud determination</strong><p>Verify the evidence and use an official company contact channel before sending a report.</p></div>
+</section>
+
+<section class="dashboard-section outreach-section">
+  <div class="section-heading"><div><span class="section-kicker">Saved companies</span><h2>Needs outreach</h2></div><small>{{ outreach_companies|length }} compan{% if outreach_companies|length == 1 %}y{% else %}ies{% endif %}</small></div>
+  {% if outreach_companies %}
+  <div class="outreach-list">
+    {% for entry in outreach_companies %}
+    {% set company = entry.company %}
+    <article class="outreach-company-card">
+      <span class="company-logo">{% if company %}<img src="/companies/{{ company.logo_brand_id }}/logo" alt="{{ company.logo_name }} logo" loading="lazy">{% else %}{{ icon('mapping', 18) }}{% endif %}</span>
+      <div class="outreach-company-copy"><strong>{{ entry.company_name }}</strong><small>Added {{ entry.created_at }}</small></div>
+      <div class="outreach-company-stat"><small>Market cap</small><strong>{% if company %}{{ company.market_cap_usd|money }}{% else %}Not available{% endif %}</strong></div>
+      <div class="outreach-company-stat"><small>Company priority</small><strong>{% if company %}{{ company.priority_score }}/100{% else %}Unavailable{% endif %}</strong></div>
+      <div class="outreach-company-actions">
+        {% if company %}<a class="button button-quiet" href="/findings#company-{{ company.anchor_id }}">View evidence</a>{% endif %}
+        <form method="post" action="/outreach/remove" data-confirm="Remove {{ entry.company_name }} from the outreach list?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="company_key" value="{{ entry.company_key }}">
+          <input type="hidden" name="return_to" value="/outreach">
+          <button class="button button-danger" type="submit">Remove</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-panel"><span>{{ icon('alert', 24) }}</span><strong>No companies saved yet</strong><p>Open Investigations and add a company after you have reviewed its evidence.</p><a class="button button-primary" href="/findings">Open investigations</a></div>
+  {% endif %}
+</section>
+{% endblock %}
